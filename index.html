@@ -9,29 +9,14 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500&display=swap">
 <script src="msal-browser.min.js"></script>
 <script>
-/* ===================== CONFIGURATION — edit these once ===================== */
+/* ===================== CONFIGURATION ===================== */
 window.FIELD_SCHEDULE_CONFIG = {
-  // From the Entra ID (Azure AD) app registration — see SETUP.md
-  clientId: "",
-  tenantId: "",                 // Directory (tenant) ID, or "welchcomer.com"
-
-  // The department calendar. Leave blank and each person picks it once from a list.
-  calendar: {
-    mailbox: "",                // e.g. "survey@welchcomer.com" if it lives in a shared mailbox; blank = calendars shared with the person
-    name: ""                    // e.g. "Survey Field Schedule"
-  },
-
-  // Outlook category names that mean each status. Blank = detect red/green automatically.
-  categories: {
-    scheduled: "",              // red   — field work not yet processed
-    partial:   "",              // yellow — partially processed
-    processed: ""               // green — office has processed it
-  },
-
-  // Words that mark an entry as time off rather than a field job (after the crew initials)
-  offWords: ["OFF", "OUT", "PTO", "SICK", "VACATION", "HOLIDAY"],
-
-  timeZone: "Pacific Standard Time"
+  clientId: "500b98fb-d49d-4a26-ac47-ed6fe1eaa3df",
+  tenantId: "a7c116b0-6582-487e-91ab-bf679445ed43",
+  // SharePoint site that holds the "Field Schedule" list, e.g. "welchcomer.sharepoint.com:/sites/Survey".
+  // Leave blank and the first person to sign in picks the site (and creates the list).
+  site: "",
+  listName: "Field Schedule"
 };
 </script>
 <style>
@@ -43,59 +28,58 @@ window.FIELD_SCHEDULE_CONFIG = {
   --font-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
   --font-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
   --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
-  --radius:10px; color-scheme:light;
+  --radius:10px;
 }
-@media (prefers-color-scheme: dark){:root{
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0E141A; --surface:#17202A; --sunk:#121A22; --ink:#E5EBF0; --muted:#93A0AD; --line:#283440;
   --accent:#6CB0DE; --accent-ink:#0E141A;
   --red:#EE6D61; --amber:#E7B84A; --amber-mark:#E7B84A; --green:#62C083; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E141A; --surface:#17202A; --sunk:#121A22; --ink:#E5EBF0; --muted:#93A0AD; --line:#283440;
+  --accent:#6CB0DE; --accent-ink:#0E141A;
+  --red:#EE6D61; --amber:#E7B84A; --amber-mark:#E7B84A; --green:#62C083; color-scheme:dark}
 
 *{box-sizing:border-box}
 html{padding-top:env(safe-area-inset-top,0px)}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.4}
 [hidden]{display:none!important}
-.wrap{max-width:860px;margin:0 auto;padding-inline:16px;padding-block:14px 110px;display:flex;flex-direction:column;gap:16px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.4}
+.wrap{max-width:860px;margin:0 auto;padding-inline:16px;padding-block:14px 96px;display:flex;flex-direction:column;gap:16px}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
-a{color:var(--accent)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
+/* header */
 .top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .brand small{display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
-h1{font-family:var(--font-display);font-weight:700;font-size:32px;line-height:1;margin:2px 0 0;letter-spacing:.01em}
-.who{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
-.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 14px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+h1{font-family:var(--font-display);font-weight:700;font-size:32px;line-height:1;margin:2px 0 0;letter-spacing:.01em;text-wrap:balance}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 14px;font-weight:600}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.btn.small{padding:6px 10px;font-size:13.5px}
 .btn:disabled{opacity:.5;cursor:default}
 
+/* summary */
 .summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;text-align:left;display:flex;flex-direction:column;gap:2px;border-top:4px solid var(--c)}
 .stat b{font-family:var(--font-display);font-size:28px;line-height:1;font-variant-numeric:tabular-nums}
 .stat span{font-size:12.5px;color:var(--muted);line-height:1.25}
-.stat[aria-pressed="true"]{outline:2px solid var(--c);outline-offset:-1px}
 @media (max-width:560px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
+/* nav */
 .nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .nav .range{font-family:var(--font-display);font-weight:600;font-size:21px;flex:1;min-width:0}
-.icon{width:38px;height:38px;padding:0;font-size:18px}
+.icon{width:38px;height:38px;padding:0;display:grid;place-items:center;font-size:18px}
 @media (max-width:560px){.nav .range{flex-basis:100%;order:-1;font-size:20px}.nav .seg{margin-left:auto}}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
 .seg button{border:0;background:none;padding:8px 12px;font-weight:600;color:var(--muted)}
 .seg button[aria-pressed="true"]{background:var(--sunk);color:var(--ink)}
-.subnav{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
-.toggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
-.toggle input{width:18px;height:18px;accent-color:var(--accent)}
 
+/* week agenda */
 .days{display:flex;flex-direction:column;gap:14px}
-.day h2{margin:0 0 6px;font-family:var(--font-display);font-weight:600;font-size:16px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.day h2{margin:0 0 6px;font-family:var(--font-display);font-weight:600;font-size:16px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:baseline}
 .day.today h2{color:var(--accent)}
-.day.today h2 .tag{font-size:11px;letter-spacing:.1em;border:1px solid currentColor;border-radius:99px;padding:0 7px}
-.day h2 .offs{font-family:var(--font-body);font-size:12.5px;letter-spacing:0;text-transform:none;font-weight:500;color:var(--muted)}
+.day.today h2::after{content:"Today";font-size:11px;letter-spacing:.1em;border:1px solid currentColor;border-radius:99px;padding:0 7px}
 .day .none{color:var(--muted);font-size:13.5px;padding:2px 0 0 2px}
 .jobs{display:flex;flex-direction:column;gap:8px}
 .job{display:grid;grid-template-columns:6px minmax(0,1fr) auto;gap:0 12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:0 12px 0 0;text-align:left;width:100%;overflow:hidden;min-height:64px}
-.job.other{opacity:.8}
 .job .stripe{align-self:stretch;background:var(--c)}
 .job .main{padding:10px 0;min-width:0;display:flex;flex-direction:column;gap:2px}
 .job .no{font-family:var(--font-mono);font-size:12px;color:var(--muted)}
@@ -104,107 +88,108 @@ h1{font-family:var(--font-display);font-weight:700;font-size:32px;line-height:1;
 .job .flag{font-size:12.5px;font-weight:600;color:var(--red)}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 9px;border-radius:99px;white-space:nowrap;color:var(--ct);background:color-mix(in srgb,var(--c) 15%,transparent)}
 .pill::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c)}
-.pill.busy::before{animation:pulse 1s infinite alternate}
-@keyframes pulse{to{opacity:.25}}
 .s-scheduled{--c:var(--red);--ct:var(--red)}
 .s-partial{--c:var(--amber-mark);--ct:var(--amber)}
 .s-processed{--c:var(--green);--ct:var(--green)}
-.s-none{--c:var(--line);--ct:var(--muted)}
 .s-all{--c:var(--accent)}
 @media (max-width:420px){.job .pill .lbl{display:none}.job .pill{padding:6px}}
 
+/* month grid */
 .month-wrap{overflow-x:auto}
-.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;min-width:330px}
+.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;min-width:340px}
 .month .dow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:center;padding-bottom:2px}
 .cell{background:var(--surface);border:1px solid var(--line);border-radius:6px;min-height:76px;padding:4px;display:flex;flex-direction:column;gap:3px;min-width:0}
 .cell.out{background:transparent;border-style:dashed}
 .cell.today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 .cell .d{border:0;background:none;padding:0 2px;text-align:left;font-variant-numeric:tabular-nums;font-weight:600;font-size:13px;color:var(--muted)}
-.chip{border:0;border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 12%,var(--surface));border-radius:3px;font-size:11.5px;line-height:1.2;padding:2px 4px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+.chip{border:0;border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 14%,var(--surface));border-radius:3px;font-size:11.5px;line-height:1.25;padding:3px 4px;text-align:left;width:100%;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.chip b{font-weight:700}
+@media (max-width:560px){.month{gap:2px}.cell{padding:2px;min-height:64px}.chip{font-size:10.5px;padding:2px 3px;border-left-width:3px;-webkit-line-clamp:4}}
 .more{font-size:11px;color:var(--muted);padding-left:2px}
 
+/* empty / notices */
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--radius);padding:22px 18px;display:flex;flex-direction:column;gap:10px}
+.empty h3{margin:0;font-family:var(--font-display);font-size:22px}
+.empty p{margin:0;color:var(--muted);max-width:60ch}
+.empty .row{display:flex;gap:8px;flex-wrap:wrap}
+.notice{font-size:13.5px;color:var(--muted)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:50%;background:var(--c);display:inline-block}
+
+/* sign-in / setup panels */
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px 18px;display:flex;flex-direction:column;gap:12px}
 .panel h3{margin:0;font-family:var(--font-display);font-size:24px}
 .panel p{margin:0;color:var(--muted);max-width:62ch}
 .panel .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.callist{display:flex;flex-direction:column;gap:6px}
-.callist button{display:flex;justify-content:space-between;gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:10px 12px}
-.callist small{color:var(--muted)}
-.notice{font-size:13.5px;color:var(--muted);margin:0}
-.notice.warn{color:var(--red)}
-.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
-.legend span{display:inline-flex;align-items:center;gap:6px}
-.legend i{width:10px;height:10px;border-radius:50%;background:var(--c);display:inline-block}
-.demo-bar{background:color-mix(in srgb,var(--amber-mark) 22%,var(--surface));border:1px solid var(--amber-mark);border-radius:8px;padding:8px 12px;font-size:13.5px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+.panel input{flex:1;min-width:200px}
+.sitelist{display:flex;flex-direction:column;gap:6px}
+.sitelist button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:10px 12px}
+.sitelist small{color:var(--muted);overflow-wrap:anywhere}
+.code{font-family:var(--font-mono);font-size:13px;background:var(--sunk);border-radius:6px;padding:8px 10px;overflow-wrap:anywhere;color:var(--ink)}
+.who{font-size:13px;color:var(--muted);display:flex;gap:10px;align-items:center;margin-top:6px}
+.linkbtn{border:0;background:none;padding:0;color:var(--accent);font-weight:600;font-size:13px}
+.syncline{font-size:12.5px;color:var(--muted);text-align:right}
 
+/* fab */
 .fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));border-radius:99px;padding:13px 20px;box-shadow:0 6px 18px rgb(0 0 0 / .22);font-size:16px;z-index:5}
 
+/* sheet */
 .scrim{position:fixed;inset:0;background:rgb(0 0 0 / .45);z-index:10;display:flex;align-items:flex-end;justify-content:center}
 .sheet{background:var(--surface);width:100%;max-width:560px;max-height:92%;overflow-y:auto;border-radius:16px 16px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
 @media (min-width:640px){.scrim{align-items:center}.sheet{border-radius:16px}}
-.sheet h3{margin:0;font-family:var(--font-display);font-size:24px;overflow-wrap:anywhere}
-.sheet .sub{margin:-8px 0 0;color:var(--muted);font-size:14px}
+.sheet h3{margin:0;font-family:var(--font-display);font-size:24px}
 .statusset{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.statusset button{border:2px solid var(--line);background:var(--surface);border-radius:10px;padding:12px 6px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13.5px;line-height:1.2}
-.statusset button::before{content:"";width:18px;height:18px;border-radius:50%;background:var(--c)}
+.statusset button{border:2px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 6px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13.5px;line-height:1.2}
+.statusset button::before{content:"";width:16px;height:16px;border-radius:50%;background:var(--c)}
 .statusset button[aria-pressed="true"]{border-color:var(--c);background:color-mix(in srgb,var(--c) 14%,var(--surface))}
-dl.facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;margin:0;font-size:14.5px}
-dl.facts dt{color:var(--muted);font-weight:600;font-size:12.5px;padding-top:2px}
-dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
 .fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .fields .full{grid-column:1/-1}
-label.f{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted);letter-spacing:.02em}
-input,select,textarea{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:9px 10px;font-size:16px;font-weight:400;width:100%;min-width:0}
-.sheet .actions{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;align-items:center}
-.err{color:var(--red);font-size:13.5px;margin:0}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:99px;font-size:14px;z-index:20;max-width:calc(100% - 32px)}
-.catsw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
+label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted);letter-spacing:.02em}
+input,textarea{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:9px 10px;font-size:16px;font-weight:400;width:100%;min-width:0}
+textarea{min-height:70px;resize:vertical}
+.sheet .actions{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.sheet .actions .right{display:flex;gap:8px}
+.danger{color:var(--red)}
+.confirm{background:color-mix(in srgb,var(--red) 10%,var(--surface));border:1px solid var(--red);border-radius:8px;padding:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px}
+.stamp{font-size:12.5px;color:var(--muted)}
+.err{color:var(--red);font-size:13.5px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(80px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:99px;font-size:14px;z-index:20;max-width:calc(100% - 32px)}
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
 </style>
+
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="brand"><small>Welch Comer · Survey</small><h1>Field Schedule</h1></div>
-    <div class="who" id="who" hidden>
-      <span id="whoName"></span>
-      <button class="btn small" id="settingsBtn">Settings</button>
+    <div class="brand"><small>Welch Comer · Survey</small><h1>Field Schedule</h1><div class="who" id="who" hidden><span id="whoName"></span><button class="linkbtn" id="signOut">Sign out</button></div></div>
+    <div class="legend" aria-label="Status key">
+      <span class="s-scheduled"><i></i>Not processed</span>
+      <span class="s-partial"><i></i>Partially processed</span>
+      <span class="s-processed"><i></i>Processed</span>
     </div>
   </header>
 
-  <div class="demo-bar" id="demoBar" hidden>
-    <span>Preview with made-up sample jobs. Nothing here touches Outlook.</span>
-    <button class="btn small" id="exitDemo">Exit preview</button>
-  </div>
-
   <section id="gate" class="panel" hidden></section>
+  <div id="app" hidden style="display:flex;flex-direction:column;gap:16px">
+  <section class="summary" id="summary" aria-label="Processing summary"></section>
 
-  <div id="app" hidden>
-    <div style="display:flex;flex-direction:column;gap:16px">
-      <div class="legend" aria-label="Status key">
-        <span class="s-scheduled"><i></i>Not processed</span>
-        <span class="s-partial"><i></i>Partially processed</span>
-        <span class="s-processed"><i></i>Processed</span>
-      </div>
-      <section class="summary" id="summary" aria-label="Processing summary"></section>
-      <div class="nav">
-        <button class="btn icon" id="prev" aria-label="Previous">‹</button>
-        <button class="btn" id="todayBtn">Today</button>
-        <button class="btn icon" id="next" aria-label="Next">›</button>
-        <div class="range" id="range"></div>
-        <div class="seg" role="group" aria-label="View">
-          <button id="vWeek" aria-pressed="true">Week</button>
-          <button id="vMonth" aria-pressed="false">Month</button>
-        </div>
-      </div>
-      <div class="subnav">
-        <label class="toggle"><input type="checkbox" id="fieldOnly" checked> Field jobs only</label>
-        <span id="syncState"></span>
-      </div>
-      <p class="notice warn" id="notice" hidden></p>
-      <main id="view" aria-live="polite"></main>
+  <div class="nav">
+    <button class="btn icon" id="prev" aria-label="Previous">‹</button>
+    <button class="btn" id="todayBtn">Today</button>
+    <button class="btn icon" id="next" aria-label="Next">›</button>
+    <div class="range" id="range"></div>
+    <div class="seg" role="group" aria-label="View">
+      <button id="vWeek" aria-pressed="true">Week</button>
+      <button id="vMonth" aria-pressed="false">Month</button>
     </div>
   </div>
+
+  <p class="notice" id="notice" hidden></p>
+  <main id="view" aria-live="polite"></main>
+  <p class="syncline" id="syncLine"></p>
+  </div>
+
 </div>
 
 <button class="btn primary fab" id="addBtn" hidden>+ Add job</button>
@@ -213,78 +198,253 @@ input,select,textarea{border:1px solid var(--line);background:var(--bg);border-r
 
 <script>
 (() => {
-  "use strict";
-  const CFG = window.FIELD_SCHEDULE_CONFIG;
-  const SCOPES = ["User.Read", "Calendars.ReadWrite", "Calendars.ReadWrite.Shared", "MailboxSettings.Read"];
-  const GRAPH = "https://graph.microsoft.com/v1.0";
   const STATUS = {
-    scheduled: {label: "Not processed", cls: "s-scheduled"},
-    partial:   {label: "Partially processed", cls: "s-partial"},
-    processed: {label: "Processed", cls: "s-processed"},
+    scheduled: {label:"Not processed", cls:"s-scheduled", cat:"Red Category"},
+    partial:   {label:"Partially processed", cls:"s-partial", cat:"Yellow Category"},
+    processed: {label:"Processed", cls:"s-processed", cat:"Green Category"},
   };
-  // Outlook preset colors (Graph categoryColor) — used to show category swatches and to auto-detect red/green
-  const PRESET = {preset0:"#E7514A",preset1:"#F38B3A",preset2:"#B67A47",preset3:"#F2C744",preset4:"#55B05B",preset5:"#3EB4A5",preset6:"#8BA647",preset7:"#4C8DD6",preset8:"#9A6DCF",preset9:"#DC5D8F",preset10:"#6E8597",preset11:"#4C6577",preset12:"#9B9B9B",preset13:"#6B6B6B",preset14:"#2B2B2B",preset15:"#A3302B",preset16:"#B05A1E",preset17:"#7D5537",preset18:"#A98B1F",preset19:"#2F7A33",preset20:"#257C73",preset21:"#5C7A24",preset22:"#22548F",preset23:"#5B3E91",preset24:"#9B3462"};
-
+  const DOW = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
   const $ = id => document.getElementById(id);
   const el = (tag, props = {}, ...kids) => {
     const n = document.createElement(tag);
-    for (const [k, v] of Object.entries(props)) {
+    for (const [k,v] of Object.entries(props)) {
       if (k === "class") n.className = v;
       else if (k === "text") n.textContent = v;
       else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
       else if (v !== undefined && v !== null && v !== false) n.setAttribute(k, v === true ? "" : v);
     }
-    for (const k of kids.flat()) if (k != null && k !== false) n.append(k);
+    for (const k of kids.flat()) if (k != null) n.append(k);
     return n;
   };
-  const store = {
-    get(k, d) { try { const v = localStorage.getItem("fs." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-    set(k, v) { try { localStorage.setItem("fs." + k, JSON.stringify(v)); } catch {} },
-    del(k) { try { localStorage.removeItem("fs." + k); } catch {} },
+
+  // ---- dates (local, YYYY-MM-DD strings) ----
+  const pad = n => String(n).padStart(2,"0");
+  const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const parse = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); };
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
+  const mondayOf = d => addDays(d, -((d.getDay()+6)%7));
+  const todayStr = () => ymd(new Date());
+  const fmtDay = d => d.toLocaleDateString(undefined,{weekday:"long", month:"short", day:"numeric"});
+  const fmtShort = d => d.toLocaleDateString(undefined,{month:"short", day:"numeric"});
+
+  // ---- state ----
+  const CFG = window.FIELD_SCHEDULE_CONFIG;
+  const GRAPH = "https://graph.microsoft.com/v1.0";
+  const SCOPES = ["User.Read", "Sites.ReadWrite.All"];
+  const LABEL_TO_KEY = {"Not processed": "scheduled", "Partially processed": "partial", "Processed": "processed"};
+  let msalApp = null, account = null, siteId = "", listId = "", siteUrl = "";
+  let jobs = [];           // [{id, ...data}]
+  let loaded = false, canWrite = true;
+  let view = "week", anchor = new Date(), filter = "all";
+  try { const v = localStorage.getItem("fs.view"); if (v === "week" || v === "month") view = v; } catch {}
+
+  const endOf = j => j.endDate && j.endDate >= j.date ? j.endDate : j.date;
+  const covers = (j, day) => j.date <= day && endOf(j) >= day;
+  const awaiting = j => (j.status || "scheduled") === "scheduled" && endOf(j) < todayStr();
+
+  // ---- summary ----
+  function renderSummary() {
+    const t = todayStr();
+    const counts = {
+      awaiting: jobs.filter(awaiting).length,
+      partial: jobs.filter(j => j.status === "partial").length,
+      upcoming: jobs.filter(j => (j.status||"scheduled") === "scheduled" && endOf(j) >= t).length,
+      processed: jobs.filter(j => j.status === "processed" && endOf(j) >= ymd(addDays(new Date(), -30))).length,
+    };
+    const tiles = [
+      ["awaiting","s-scheduled","Field done, not processed"],
+      ["partial","s-partial","Partially processed"],
+      ["upcoming","s-all","Scheduled ahead"],
+      ["processed","s-processed","Processed, last 30 days"],
+    ];
+    $("summary").replaceChildren(...tiles.map(([k, cls, label]) =>
+      el("div", {class:`stat ${cls}`},
+        el("b", {text: loaded ? counts[k] : "–"}), el("span", {text: label}))));
+  }
+  const passes = j => {
+    return true; // the calendar always shows every job; the tiles above only count
+    if (filter === "all") return true;
+    if (filter === "awaiting") return awaiting(j);
+    if (filter === "partial") return j.status === "partial";
+    if (filter === "upcoming") return (j.status||"scheduled") === "scheduled" && endOf(j) >= todayStr();
+    if (filter === "processed") return j.status === "processed";
+    return true;
   };
 
-  // ---------- dates ----------
-  const pad = n => String(n).padStart(2, "0");
-  const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  const parse = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m-1, d); };
-  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
-  const mondayOf = d => { const x = addDays(d, -((d.getDay()+6) % 7)); x.setHours(0,0,0,0); return x; };
-  const todayStr = () => ymd(new Date());
-  const fmtDay = d => d.toLocaleDateString(undefined, {weekday:"long", month:"short", day:"numeric"});
-  const fmtShort = d => d.toLocaleDateString(undefined, {month:"short", day:"numeric"});
-  const monthKey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}`;
-
-  // ---------- subject parsing: "RR/TM - 42021.200 Mon Search" ----------
-  const JOBNO = /\b\d{4,6}(?:\.\d{1,3}){1,2}\b/;
-  function parseSubject(subject) {
-    const s = (subject || "").trim();
-    const m = s.match(/^([A-Z]{2,3}(?:\s*\/\s*[A-Z]{2,3})*)\s*(?:[-–—]\s*|\s+(?=\d{4}))(.+)$/);
-    const crew = m ? m[1].replace(/\s+/g, "") : "";
-    let rest = m ? m[2].trim() : s;
-    const off = !!m && CFG.offWords.some(w => rest.toUpperCase() === w);
-    let jobNo = "";
-    const j = rest.match(JOBNO);
-    if (j) { jobNo = j[0]; rest = (rest.slice(0, j.index) + rest.slice(j.index + j[0].length)).replace(/^\s*[-–—:]?\s*/, "").replace(/\s{2,}/g, " ").trim(); }
-    const isField = !off && (!!jobNo || !!crew);
-    return {crew, jobNo, name: rest || s, isField, off};
+  // ---- job card ----
+  function jobCard(j, day) {
+    const st = STATUS[j.status] || STATUS.scheduled;
+    const multi = j.endDate && j.endDate > j.date;
+    const meta = [j.crew, j.location].filter(Boolean).join(" · ");
+    return el("button", {class:`job ${st.cls}`, onclick: () => openSheet(j)},
+      el("span", {class:"stripe", "aria-hidden":"true"}),
+      el("span", {class:"main"},
+        j.jobNo ? el("span", {class:"no", text: j.jobNo}) : null,
+        el("span", {class:"name", text: j.title || "Untitled job"}),
+        meta ? el("span", {class:"meta", text: meta}) : null,
+        multi ? el("span", {class:"meta", text: `${fmtShort(parse(j.date))} – ${fmtShort(parse(j.endDate))}`}) : null,
+        awaiting(j) ? el("span", {class:"flag", text:"Field work done · waiting on office"}) : null),
+      el("span", {class:"pill"}, el("span", {class:"lbl", text: st.label})));
   }
 
-  // ---------- state ----------
-  let mode = "live";                // "live" | "demo"
-  let msalApp = null, account = null;
-  let cal = null;                   // {path, name, owner, canEdit}
-  let cats = {scheduled: "", partial: "", processed: ""};
-  let master = [];                  // [{displayName, color}]
-  const months = new Map();         // "YYYY-MM" -> {at: ms, events: [...]}
-  let events = [];                  // normalized, deduped
-  let view = store.get("view", "week"), anchor = new Date(), filter = "all";
-  let fieldOnly = store.get("fieldOnly", true);
-  let busy = new Set();
-  $("fieldOnly").checked = fieldOnly;
+  // ---- views ----
+  function renderWeek() {
+    const start = mondayOf(anchor), t = todayStr();
+    $("range").textContent = `${fmtShort(start)} – ${fmtShort(addDays(start,6))}, ${addDays(start,6).getFullYear()}`;
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(start, i), ds = ymd(d);
+      const list = jobs.filter(j => covers(j, ds) && passes(j)).sort(byOrder);
+      const isWeekend = i >= 5;
+      if (isWeekend && !list.length && ds !== t) continue;
+      days.push(el("section", {class: "day" + (ds === t ? " today" : "")},
+        el("h2", {text: fmtDay(d)}),
+        list.length ? el("div", {class:"jobs"}, list.map(j => jobCard(j, ds)))
+                    : el("div", {class:"none", text: "No field work scheduled"})));
+    }
+    return el("div", {class:"days"}, days);
+  }
+  const byOrder = (a, b) => (a.date+(a.jobNo||"")+(a.title||"")).localeCompare(b.date+(b.jobNo||"")+(b.title||""));
 
-  // ---------- Graph ----------
-  async function token() {
-    const req = {scopes: SCOPES, account};
+  function renderMonth() {
+    const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+    const start = mondayOf(first), t = todayStr();
+    $("range").textContent = first.toLocaleDateString(undefined,{month:"long", year:"numeric"});
+    const cells = DOW.map(d => el("div", {class:"dow", text:d}));
+    const last = new Date(first.getFullYear(), first.getMonth()+1, 0);
+    const end = addDays(mondayOf(last), 6);
+    for (let d = start; d <= end; d = addDays(d, 1)) {
+      const ds = ymd(d), list = jobs.filter(j => covers(j, ds) && passes(j)).sort(byOrder);
+      const day = new Date(d);
+      cells.push(el("div", {class:"cell" + (d.getMonth() !== first.getMonth() ? " out" : "") + (ds === t ? " today" : "")},
+        el("button", {class:"d", text: d.getDate(), "aria-label": `Open week of ${fmtDay(d)}`,
+          onclick: () => { anchor = day; setView("week"); }}),
+        list.map(j => el("button", {class:`chip ${(STATUS[j.status]||STATUS.scheduled).cls}`,
+          title: [j.crew, j.jobNo, j.title].filter(Boolean).join(" · ") + " — " + (STATUS[j.status]||STATUS.scheduled).label,
+          onclick: () => openSheet(j)},
+          j.crew ? el("b", {text: j.crew + " "}) : null, [j.jobNo, j.title || "Untitled"].filter(Boolean).join(" ")))));
+    }
+    return el("div", {class:"month-wrap"}, el("div", {class:"month"}, cells));
+  }
+
+  function renderEmpty() {
+    return el("div", {class:"empty"},
+      el("h3", {text: loaded ? "No jobs on the schedule yet" : "Loading the schedule…"}),
+      el("p", {text: loaded
+        ? "Add the first field job with the + Add job button. New jobs start red until the office processes the field data."
+        : "Jobs appear here once the shared schedule loads."}),
+      loaded && canWrite ? el("div", {class:"row"},
+        el("button", {class:"btn primary", text:"+ Add job", onclick: () => openSheet(null)})) : null);
+  }
+
+  function render() {
+    renderSummary();
+    $("vWeek").setAttribute("aria-pressed", String(view === "week"));
+    $("vMonth").setAttribute("aria-pressed", String(view === "month"));
+    const body = view === "week" ? renderWeek() : renderMonth();
+    $("view").replaceChildren(!jobs.length ? renderEmpty() : body);
+    $("addBtn").hidden = !canWrite;
+  }
+  function setView(v) { view = v; try { localStorage.setItem("fs.view", v); } catch {} render(); }
+
+  $("vWeek").onclick = () => setView("week");
+  $("vMonth").onclick = () => setView("month");
+  $("todayBtn").onclick = () => { anchor = new Date(); render(); };
+  $("prev").onclick = () => { anchor = view === "week" ? addDays(anchor, -7) : new Date(anchor.getFullYear(), anchor.getMonth()-1, 1); render(); };
+  $("next").onclick = () => { anchor = view === "week" ? addDays(anchor, 7) : new Date(anchor.getFullYear(), anchor.getMonth()+1, 1); render(); };
+  $("addBtn").onclick = () => openSheet(null);
+
+  // ---- toast ----
+  let toastT;
+  function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
+
+  // ---- editor sheet ----
+  async function openSheet(job) {
+    const isNew = !job;
+    const draft = isNew ? {status:"scheduled", date: ymd(view === "week" && mondayOf(anchor) > new Date() ? mondayOf(anchor) : new Date())} : {...job};
+    const statusBtns = Object.entries(STATUS).map(([k, s]) =>
+      el("button", {type:"button", class: s.cls, "aria-pressed": String(draft.status === k), disabled: !canWrite,
+        onclick: e => { draft.status = k; statusBtns.forEach(b => b.setAttribute("aria-pressed", String(b === e.currentTarget))); }},
+        s.label));
+    const f = id => el("input", {id, value: draft[id.replace("f_","")] || "", disabled: !canWrite});
+    const iJob = f("f_jobNo"), iTitle = f("f_title"), iCrew = f("f_crew"), iLoc = f("f_location");
+    const iDate = el("input", {id:"f_date", type:"date", value: draft.date || "", disabled: !canWrite, required: true});
+    const iEnd = el("input", {id:"f_endDate", type:"date", value: draft.endDate || "", disabled: !canWrite});
+    const iNotes = el("textarea", {id:"f_notes", disabled: !canWrite}); iNotes.value = draft.notes || "";
+    iJob.placeholder = "e.g. 26-1142"; iTitle.placeholder = "Job name or site"; iCrew.placeholder = "Crew or party chief"; iLoc.placeholder = "Address, township/range, etc.";
+    const err = el("p", {class:"err", hidden: true});
+    const stamp = el("p", {class:"stamp", hidden: true});
+    const confirmBox = el("div", {class:"confirm", hidden: true},
+      el("span", {text:"Delete this job for everyone?"}),
+      el("button", {class:"btn danger", type:"button", text:"Delete", onclick: doDelete}),
+      el("button", {class:"btn", type:"button", text:"Keep", onclick: () => confirmBox.hidden = true}));
+
+    const save = el("button", {class:"btn primary", type:"submit", text: isNew ? "Add job" : "Save", hidden: !canWrite});
+    const form = el("form", {class:"sheet", role:"dialog", "aria-modal":"true", "aria-label": isNew ? "Add job" : "Edit job"},
+      el("h3", {text: isNew ? "Add field job" : (job.title || "Job")}),
+      el("div", {class:"statusset", role:"group", "aria-label":"Processing status"}, statusBtns),
+      el("div", {class:"fields"},
+        el("label", {for:"f_jobNo"}, "Job number", iJob),
+        el("label", {for:"f_crew"}, "Crew", iCrew),
+        el("label", {class:"full", for:"f_title"}, "Job", iTitle),
+        el("label", {for:"f_date"}, "Field date", iDate),
+        el("label", {for:"f_endDate"}, "Through (optional)", iEnd),
+        el("label", {class:"full", for:"f_location"}, "Location", iLoc),
+        el("label", {class:"full", for:"f_notes"}, "Office notes", iNotes)),
+      stamp, err, confirmBox,
+      el("div", {class:"actions"},
+        !isNew && canWrite ? el("button", {class:"btn danger", type:"button", text:"Delete", onclick: () => confirmBox.hidden = false}) : el("span"),
+        el("div", {class:"right"}, el("button", {class:"btn", type:"button", text: canWrite ? "Cancel" : "Close", onclick: close}), save)));
+
+    const scrim = el("div", {class:"scrim", onclick: e => { if (e.target === scrim) close(); }}, form);
+    const onKey = e => { if (e.key === "Escape") close(); };
+    function close() { scrim.remove(); document.removeEventListener("keydown", onKey); }
+    document.addEventListener("keydown", onKey);
+    $("sheetHost").replaceChildren(scrim);
+    (isNew ? iTitle : statusBtns.find(b => b.getAttribute("aria-pressed") === "true"))?.focus();
+
+    if (!isNew && job.updatedByName) {
+      const who = job.updatedByName;
+      const when = job.updatedAt ? new Date(job.updatedAt).toLocaleString(undefined,{month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}) : "";
+      stamp.textContent = `Last updated by ${who}${when ? " · " + when : ""}`;
+      stamp.hidden = false;
+    }
+
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+      err.hidden = true;
+      const data = {
+        status: draft.status || "scheduled",
+        jobNo: iJob.value.trim(), title: iTitle.value.trim(), crew: iCrew.value.trim(),
+        location: iLoc.value.trim(), notes: iNotes.value.trim(),
+        date: iDate.value, endDate: iEnd.value && iEnd.value > iDate.value ? iEnd.value : "",
+      };
+      if (!data.date) { err.textContent = "Pick a field date."; err.hidden = false; return; }
+      if (!data.title && !data.jobNo) { err.textContent = "Enter a job name or job number."; err.hidden = false; return; }
+      save.disabled = true;
+      try {
+        if (isNew) await graph(`${itemsPath()}`, {method: "POST", body: {fields: toFields(data)}});
+        else await graph(`${itemsPath()}/${job.id}/fields`, {method: "PATCH", body: toFields(data)});
+        close(); toast(isNew ? "Job added" : "Saved"); load();
+      } catch (ex) {
+        save.disabled = false;
+        err.textContent = ex && ex.status === 403
+          ? "You can view the schedule but not change it. Ask the SharePoint site owner for Edit access."
+          : "Couldn't save: " + ((ex && ex.message) || "check your connection and try again.");
+        err.hidden = false;
+        if (ex && ex.status === 403) { canWrite = false; render(); }
+      }
+    });
+
+    async function doDelete() {
+      try { await graph(`${itemsPath()}/${job.id}`, {method: "DELETE"}); close(); toast("Job deleted"); load(); }
+      catch { err.textContent = "Couldn't delete this job. Try again."; err.hidden = false; }
+    }
+  }
+
+  // ---- Microsoft Graph ----
+  async function token(extra) {
+    const req = {scopes: extra ? SCOPES.concat(extra) : SCOPES, account};
     try { return (await msalApp.acquireTokenSilent(req)).accessToken; }
     catch (e) {
       if (e instanceof msal.InteractionRequiredAuthError) { await msalApp.acquireTokenRedirect(req); return new Promise(() => {}); }
@@ -294,15 +454,10 @@ input,select,textarea{border:1px solid var(--line);background:var(--bg);border-r
   async function graph(path, opts = {}) {
     const url = path.startsWith("http") ? path : GRAPH + path;
     for (let attempt = 0; attempt < 3; attempt++) {
-      const res = await fetch(url, {
-        method: opts.method || "GET",
-        headers: {Authorization: "Bearer " + await token(), "Content-Type": "application/json",
-                  Prefer: `outlook.timezone="${CFG.timeZone}"`, ...(opts.headers || {})},
-        body: opts.body ? JSON.stringify(opts.body) : undefined,
-      });
-      if (res.status === 429 || res.status === 503) {
-        await new Promise(r => setTimeout(r, (Number(res.headers.get("Retry-After")) || 2) * 1000)); continue;
-      }
+      const res = await fetch(url, {method: opts.method || "GET",
+        headers: {Authorization: "Bearer " + await token(opts.extraScopes), "Content-Type": "application/json"},
+        body: opts.body ? JSON.stringify(opts.body) : undefined});
+      if (res.status === 429 || res.status === 503) { await new Promise(r => setTimeout(r, (Number(res.headers.get("Retry-After")) || 2) * 1000)); continue; }
       if (!res.ok) {
         let msg = res.statusText; try { msg = (await res.json()).error?.message || msg; } catch {}
         const err = new Error(msg); err.status = res.status; throw err;
@@ -311,416 +466,138 @@ input,select,textarea{border:1px solid var(--line);background:var(--bg);border-r
     }
     const err = new Error("Microsoft 365 is busy. Try again in a minute."); err.status = 429; throw err;
   }
-  async function graphAll(path) {
-    let out = [], next = path;
-    while (next) { const page = await graph(next); out = out.concat(page.value || []); next = page["@odata.nextLink"]; }
-    return out;
-  }
+  const itemsPath = () => `/sites/${siteId}/lists/${listId}/items`;
+  const toFields = d => ({Title: d.title, JobNo: d.jobNo, Crew: d.crew, FieldDate: d.date, EndDate: d.endDate,
+    Location: d.location, Notes: d.notes, Status: STATUS[d.status].label});
+  const fromItem = it => { const f = it.fields || {}; return {id: it.id, title: f.Title || "", jobNo: f.JobNo || "", crew: f.Crew || "",
+    date: f.FieldDate || "", endDate: f.EndDate || "", location: f.Location || "", notes: f.Notes || "",
+    status: LABEL_TO_KEY[f.Status] || "scheduled",
+    updatedByName: it.lastModifiedBy?.user?.displayName || "", updatedAt: it.lastModifiedDateTime || ""}; };
 
-  // ---------- event normalization ----------
-  function normalize(ev) {
-    const sd = ev.start.dateTime.slice(0, 10);
-    let ed = ev.end.dateTime.slice(0, 10);
-    const endMidnight = ev.end.dateTime.slice(11, 19) === "00:00:00";
-    if ((ev.isAllDay || endMidnight) && ed > sd) ed = ymd(addDays(parse(ed), -1));
-    const p = parseSubject(ev.subject);
-    const cs = ev.categories || [];
-    const status = cats.processed && cs.includes(cats.processed) ? "processed"
-                 : cats.partial && cs.includes(cats.partial) ? "partial"
-                 : cats.scheduled && cs.includes(cats.scheduled) ? "scheduled" : (p.isField ? "scheduled" : "none");
-    return {id: ev.id, subject: ev.subject || "(No subject)", ...p, date: sd, endDate: ed > sd ? ed : "",
-      time: ev.isAllDay ? "" : ev.start.dateTime.slice(11, 16), categories: cs, status,
-      location: ev.location?.displayName || "", preview: ev.bodyPreview || "", webLink: ev.webLink || ""};
-  }
-  const endOf = e => e.endDate || e.date;
-  const covers = (e, d) => e.date <= d && endOf(e) >= d;
-  const awaiting = e => e.isField && e.status === "scheduled" && endOf(e) < todayStr();
-  function rebuild() {
-    const byId = new Map();
-    for (const m of months.values()) for (const e of m.events) byId.set(e.id, e);
-    events = [...byId.values()];
-  }
-
-  async function loadMonth(key, force) {
-    const have = months.get(key);
-    if (have && !force && Date.now() - have.at < 90_000) return;
-    if (mode === "demo") { if (!have) months.set(key, {at: Date.now(), events: demoMonth(key)}); return; }
-    const [y, m] = key.split("-").map(Number);
-    const start = `${key}-01T00:00:00`, end = `${ymd(new Date(y, m, 1))}T00:00:00`;
-    const sel = "$select=id,subject,start,end,isAllDay,categories,location,bodyPreview,webLink";
-    const raw = await graphAll(`${cal.path}/calendarView?startDateTime=${start}&endDateTime=${end}&${sel}&$top=250&$orderby=start/dateTime`);
-    months.set(key, {at: Date.now(), events: raw.map(normalize)});
-  }
-  function neededMonths() {
-    const keys = new Set();
-    const t = new Date();
-    for (let i = -2; i <= 3; i++) keys.add(monthKey(new Date(t.getFullYear(), t.getMonth() + i, 1)));
-    if (view === "week") { const s = mondayOf(anchor); keys.add(monthKey(s)); keys.add(monthKey(addDays(s, 6))); }
-    else { const f = new Date(anchor.getFullYear(), anchor.getMonth(), 1); keys.add(monthKey(addDays(f, -7))); keys.add(monthKey(f)); keys.add(monthKey(new Date(f.getFullYear(), f.getMonth()+1, 7))); }
-    return [...keys];
-  }
-  let syncing = false;
-  async function sync(force) {
-    if (syncing || !cal) return;
-    syncing = true; $("syncState").textContent = "Syncing with Outlook…";
+  let loading = false;
+  async function load() {
+    if (loading || !listId) return; loading = true;
     try {
-      for (const k of neededMonths()) await loadMonth(k, force);
-      rebuild(); $("notice").hidden = true;
-      $("syncState").textContent = mode === "demo" ? "Sample data" : "Updated " + new Date().toLocaleTimeString(undefined, {hour:"numeric", minute:"2-digit"});
-    } catch (e) {
-      showNotice(e.status === 403 || e.status === 404
-        ? "You don't have access to this calendar. Ask whoever owns it to share it with you, or pick another one in Settings."
-        : "Couldn't reach Outlook: " + e.message);
-      $("syncState").textContent = "";
-    } finally { syncing = false; render(); }
-  }
-  function showNotice(t) { $("notice").textContent = t; $("notice").hidden = false; }
-
-  // ---------- rendering ----------
-  const visible = e => (fieldOnly ? e.isField : !e.off) && passes(e);
-  const passes = e => {
-    if (filter === "all") return true;
-    if (filter === "awaiting") return awaiting(e);
-    if (filter === "partial") return e.isField && e.status === "partial";
-    if (filter === "upcoming") return e.isField && e.status === "scheduled" && endOf(e) >= todayStr();
-    if (filter === "processed") return e.isField && e.status === "processed";
-    return true;
-  };
-  const byOrder = (a, b) => (a.date + (a.time || "") + a.subject).localeCompare(b.date + (b.time || "") + b.subject);
-
-  function renderSummary() {
-    const t = todayStr(), cutoff = ymd(addDays(new Date(), -30)), field = events.filter(e => e.isField);
-    const n = {
-      awaiting: field.filter(awaiting).length,
-      partial: field.filter(e => e.status === "partial").length,
-      upcoming: field.filter(e => e.status === "scheduled" && endOf(e) >= t).length,
-      processed: field.filter(e => e.status === "processed" && endOf(e) >= cutoff).length,
-    };
-    const tiles = [["awaiting","s-scheduled","Field done, not processed"],["partial","s-partial","Partially processed"],
-                   ["upcoming","s-all","Scheduled ahead"],["processed","s-processed","Processed, last 30 days"]];
-    $("summary").replaceChildren(...tiles.map(([k, cls, label]) =>
-      el("button", {class: `stat ${cls}`, "aria-pressed": String(filter === k), title: filter === k ? "Show all jobs" : "Show only these jobs",
-        onclick: () => { filter = filter === k ? "all" : k; render(); }},
-        el("b", {text: events.length || months.size ? n[k] : "–"}), el("span", {text: label}))));
-  }
-
-  function card(e) {
-    const st = STATUS[e.status] || {label: "", cls: "s-none"};
-    const meta = [e.crew && "Crew " + e.crew, e.time && fmtTime(e.time), e.location].filter(Boolean).join(" · ");
-    return el("button", {class: `job ${st.cls}${e.isField ? "" : " other"}`, onclick: () => openJob(e)},
-      el("span", {class: "stripe", "aria-hidden": "true"}),
-      el("span", {class: "main"},
-        e.jobNo ? el("span", {class: "no", text: e.jobNo}) : null,
-        el("span", {class: "name", text: e.isField ? e.name : e.subject}),
-        meta ? el("span", {class: "meta", text: meta}) : null,
-        e.endDate ? el("span", {class: "meta", text: `${fmtShort(parse(e.date))} – ${fmtShort(parse(e.endDate))}`}) : null,
-        awaiting(e) ? el("span", {class: "flag", text: "Field work done · waiting on office"}) : null),
-      e.isField ? el("span", {class: "pill" + (busy.has(e.id) ? " busy" : "")}, el("span", {class: "lbl", text: st.label})) : el("span"));
-  }
-  const fmtTime = t => { const [h, m] = t.split(":").map(Number); return new Date(2000,0,1,h,m).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); };
-
-  function renderWeek() {
-    const start = mondayOf(anchor), t = todayStr();
-    $("range").textContent = `${fmtShort(start)} – ${fmtShort(addDays(start, 6))}, ${addDays(start, 6).getFullYear()}`;
-    const out = [];
-    for (let i = 0; i < 7; i++) {
-      const d = addDays(start, i), ds = ymd(d);
-      const list = events.filter(e => covers(e, ds) && visible(e)).sort(byOrder);
-      const offs = events.filter(e => e.off && covers(e, ds)).map(e => `${e.crew} ${e.name.toLowerCase()}`);
-      if (i >= 5 && !list.length && ds !== t) continue;
-      out.push(el("section", {class: "day" + (ds === t ? " today" : "")},
-        el("h2", {}, el("span", {text: fmtDay(d)}), ds === t ? el("span", {class: "tag", text: "Today"}) : null,
-          offs.length ? el("span", {class: "offs", text: [...new Set(offs)].join(" · ")}) : null),
-        list.length ? el("div", {class: "jobs"}, list.map(card))
-                    : el("div", {class: "none", text: filter === "all" ? "No field work scheduled" : "Nothing matching this filter"})));
-    }
-    return el("div", {class: "days"}, out);
-  }
-
-  function renderMonth() {
-    const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1), t = todayStr();
-    $("range").textContent = first.toLocaleDateString(undefined, {month: "long", year: "numeric"});
-    const cells = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => el("div", {class: "dow", text: d}));
-    const end = addDays(mondayOf(new Date(first.getFullYear(), first.getMonth()+1, 0)), 6);
-    for (let d = mondayOf(first); d <= end; d = addDays(d, 1)) {
-      const ds = ymd(d), day = new Date(d), list = events.filter(e => covers(e, ds) && visible(e)).sort(byOrder);
-      cells.push(el("div", {class: "cell" + (d.getMonth() !== first.getMonth() ? " out" : "") + (ds === t ? " today" : "")},
-        el("button", {class: "d", text: d.getDate(), "aria-label": "Open week of " + fmtDay(d), onclick: () => { anchor = day; setView("week"); }}),
-        list.slice(0, 3).map(e => el("button", {class: `chip ${(STATUS[e.status] || {cls: "s-none"}).cls}`, title: e.subject, onclick: () => openJob(e),
-          text: e.isField ? [e.crew, e.name].filter(Boolean).join(" · ") : e.subject})),
-        list.length > 3 ? el("span", {class: "more", text: `+${list.length - 3} more`}) : null));
-    }
-    return el("div", {class: "month-wrap"}, el("div", {class: "month"}, cells));
-  }
-
-  function render() {
-    renderSummary();
-    $("vWeek").setAttribute("aria-pressed", String(view === "week"));
-    $("vMonth").setAttribute("aria-pressed", String(view === "month"));
-    $("view").replaceChildren(view === "week" ? renderWeek() : renderMonth());
-  }
-  function setView(v) { view = v; store.set("view", v); render(); sync(false); }
-  $("vWeek").onclick = () => setView("week");
-  $("vMonth").onclick = () => setView("month");
-  $("todayBtn").onclick = () => { anchor = new Date(); render(); sync(false); };
-  $("prev").onclick = () => { anchor = view === "week" ? addDays(anchor, -7) : new Date(anchor.getFullYear(), anchor.getMonth()-1, 1); render(); sync(false); };
-  $("next").onclick = () => { anchor = view === "week" ? addDays(anchor, 7) : new Date(anchor.getFullYear(), anchor.getMonth()+1, 1); render(); sync(false); };
-  $("fieldOnly").onchange = e => { fieldOnly = e.target.checked; store.set("fieldOnly", fieldOnly); render(); };
-
-  let toastT;
-  function toast(m) { const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2800); }
-
-  // ---------- sheets ----------
-  function sheet(title, ...content) {
-    const box = el("div", {class: "sheet", role: "dialog", "aria-modal": "true", "aria-label": title}, ...content);
-    const scrim = el("div", {class: "scrim", onclick: e => { if (e.target === scrim) close(); }}, box);
-    const onKey = e => { if (e.key === "Escape") close(); };
-    function close() { scrim.remove(); document.removeEventListener("keydown", onKey); }
-    document.addEventListener("keydown", onKey);
-    $("sheetHost").replaceChildren(scrim);
-    return close;
-  }
-
-  function openJob(e) {
-    const err = el("p", {class: "err", hidden: true});
-    const btns = Object.entries(STATUS).map(([k, s]) => el("button", {type: "button", class: s.cls, "aria-pressed": String(e.status === k), onclick: () => setStatus(k)}, s.label));
-    const facts = el("dl", {class: "facts"},
-      e.jobNo ? [el("dt", {text: "Job"}), el("dd", {text: e.jobNo})] : null,
-      e.crew ? [el("dt", {text: "Crew"}), el("dd", {text: e.crew})] : null,
-      el("dt", {text: "Date"}), el("dd", {text: fmtDay(parse(e.date)) + (e.endDate ? " – " + fmtDay(parse(e.endDate)) : "") + (e.time ? " · " + fmtTime(e.time) : "")}),
-      e.location ? [el("dt", {text: "Location"}), el("dd", {text: e.location})] : null,
-      e.categories.length ? [el("dt", {text: "Categories"}), el("dd", {text: e.categories.join(", ")})] : null,
-      e.preview ? [el("dt", {text: "Notes"}), el("dd", {text: e.preview})] : null);
-    const close = sheet(e.subject,
-      el("h3", {text: e.isField ? e.name : e.subject}),
-      e.isField ? el("p", {class: "sub", text: e.subject}) : null,
-      el("div", {class: "statusset", role: "group", "aria-label": "Processing status"}, btns),
-      facts, err,
-      el("div", {class: "actions"},
-        e.webLink && mode === "live" ? el("a", {class: "btn", href: e.webLink, target: "_blank", rel: "noopener", text: "Open in Outlook"}) : el("span"),
-        el("button", {class: "btn", type: "button", text: "Close", onclick: () => close()})));
-
-    async function setStatus(k) {
-      const name = cats[k];
-      if (!name) { close(); openSettings(`Pick which Outlook category means "${STATUS[k].label}" first.`); return; }
-      if (e.status === k) return;
-      const statusNames = Object.values(cats).filter(Boolean);
-      const next = e.categories.filter(c => !statusNames.includes(c)).concat(name);
-      const prev = {status: e.status, categories: e.categories};
-      Object.assign(e, {status: k, categories: next}); busy.add(e.id);
-      btns.forEach((b, i) => b.setAttribute("aria-pressed", String(Object.keys(STATUS)[i] === k)));
+      let next = `${itemsPath()}?$expand=fields($select=Title,JobNo,Crew,FieldDate,EndDate,Location,Notes,Status)&$top=999`, all = [];
+      while (next) { const page = await graph(next); all = all.concat(page.value || []); next = page["@odata.nextLink"]; }
+      jobs = all.map(fromItem).filter(j => /^\d{4}-\d{2}-\d{2}$/.test(j.date));
+      loaded = true; $("notice").hidden = true;
+      $("syncLine").textContent = "Updated " + new Date().toLocaleTimeString(undefined, {hour: "numeric", minute: "2-digit"});
       render();
-      try {
-        if (mode === "live") await graph(`${cal.path}/events/${encodeURIComponent(e.id)}`, {method: "PATCH", body: {categories: next}});
-        busy.delete(e.id); render(); close(); toast(`Marked ${STATUS[k].label.toLowerCase()}${mode === "live" ? " in Outlook" : " (preview only)"}`);
-      } catch (x) {
-        Object.assign(e, prev); busy.delete(e.id); render();
-        btns.forEach((b, i) => b.setAttribute("aria-pressed", String(Object.keys(STATUS)[i] === prev.status)));
-        err.textContent = x.status === 403 ? "You can see this calendar but can't edit it. Ask its owner for Editor permission."
-          : "Couldn't update Outlook: " + x.message;
-        err.hidden = false;
-      }
-    }
+    } catch (e) {
+      $("notice").hidden = false;
+      $("notice").textContent = e.status === 403 || e.status === 404
+        ? "You don't have access to the schedule's SharePoint site. Ask the site owner to add you."
+        : "Couldn't load the schedule: " + e.message;
+    } finally { loading = false; }
   }
 
-  function openAdd() {
-    if (!cats.scheduled) { openSettings('Pick which Outlook category means "Not processed" before adding jobs.'); return; }
-    const base = view === "week" && mondayOf(anchor) > new Date() ? mondayOf(anchor) : new Date();
-    const i = (id, props = {}) => el("input", {id, ...props});
-    const fCrew = i("a_crew", {placeholder: "RR/TM", autocapitalize: "characters"}), fNo = i("a_no", {placeholder: "42021.200", inputmode: "decimal"});
-    const fName = i("a_name", {placeholder: "Mon Search"}), fLoc = i("a_loc", {placeholder: "Address or site"});
-    const fDate = i("a_date", {type: "date", value: ymd(base)}), fEnd = i("a_end", {type: "date"});
-    const preview = el("p", {class: "notice"}), err = el("p", {class: "err", hidden: true});
-    const subj = () => { const c = fCrew.value.trim().toUpperCase().replace(/\s+/g, ""); return [c, [fNo.value.trim(), fName.value.trim()].filter(Boolean).join(" ")].filter(Boolean).join(" - "); };
-    const upd = () => preview.textContent = "Outlook subject: " + (subj() || "—");
-    [fCrew, fNo, fName].forEach(f => f.addEventListener("input", upd)); upd();
-    const save = el("button", {class: "btn primary", type: "submit", text: "Add to Outlook"});
-    const form = el("form", {},
-      el("div", {class: "fields"},
-        el("label", {class: "f", for: "a_crew"}, "Crew initials", fCrew),
-        el("label", {class: "f", for: "a_no"}, "Job number", fNo),
-        el("label", {class: "f full", for: "a_name"}, "Job name", fName),
-        el("label", {class: "f", for: "a_date"}, "Field date", fDate),
-        el("label", {class: "f", for: "a_end"}, "Through (optional)", fEnd),
-        el("label", {class: "f full", for: "a_loc"}, "Location (optional)", fLoc)));
-    const close = sheet("Add field job", el("h3", {text: "Add field job"}), form, preview, err,
-      el("div", {class: "actions"}, el("button", {class: "btn", type: "button", text: "Cancel", onclick: () => close()}), save));
-    save.onclick = () => form.requestSubmit();
-    form.addEventListener("submit", async ev => {
-      ev.preventDefault(); err.hidden = true;
-      if (!fCrew.value.trim() || !(fNo.value.trim() || fName.value.trim()) || !fDate.value) { err.textContent = "Enter crew initials, a job number or name, and a date."; err.hidden = false; return; }
-      const last = fEnd.value && fEnd.value > fDate.value ? fEnd.value : fDate.value;
-      const body = {subject: subj(), isAllDay: true, showAs: "free", isReminderOn: false, categories: [cats.scheduled],
-        start: {dateTime: fDate.value + "T00:00:00", timeZone: CFG.timeZone},
-        end: {dateTime: ymd(addDays(parse(last), 1)) + "T00:00:00", timeZone: CFG.timeZone}};
-      if (fLoc.value.trim()) body.location = {displayName: fLoc.value.trim()};
-      save.disabled = true;
-      try {
-        const key = monthKey(parse(fDate.value));
-        if (mode === "live") { await graph(`${cal.path}/events`, {method: "POST", body}); months.delete(key); }
-        else { await loadMonth(key); months.get(key).events.push(normalize({id: "demo-" + Date.now(), ...body})); }
-        close(); toast(mode === "live" ? "Added to Outlook" : "Added (preview only)");
-        sync(mode === "live");
-      } catch (x) {
-        save.disabled = false;
-        err.textContent = x.status === 403 ? "You can't add events to this calendar. Ask its owner for Editor permission." : "Couldn't add the job: " + x.message;
-        err.hidden = false;
-      }
-    });
-  }
-  $("addBtn").onclick = openAdd;
-
-  // ---------- settings ----------
-  function catOptions(sel) {
-    const s = el("select", {}, el("option", {value: "", text: "— none —"}),
-      master.map(c => el("option", {value: c.displayName, text: c.displayName, selected: c.displayName === sel})));
-    if (sel && !master.some(c => c.displayName === sel)) s.append(el("option", {value: sel, text: sel + " (not in your list)", selected: true}));
-    return s;
-  }
-  function openSettings(why) {
-    const sels = {}; const err = el("p", {class: "err", hidden: !why, text: why || ""});
-    const rows = Object.entries(STATUS).map(([k, s]) => { sels[k] = catOptions(cats[k]); sels[k].id = "c_" + k;
-      return el("label", {class: "f full", for: "c_" + k}, el("span", {class: s.cls}, el("span", {class: "catsw", style: "background:var(--c)"}), s.label), sels[k]); });
-    const close = sheet("Settings",
-      el("h3", {text: "Settings"}),
-      el("p", {class: "notice", text: cal ? `Calendar: ${cal.name}${cal.owner ? " (" + cal.owner + ")" : ""}` : "No calendar chosen"}),
-      el("p", {class: "notice", text: "Outlook category for each status. Changing a status in this app swaps the job's category in Outlook, so the colors match for everyone."}),
-      el("div", {class: "fields"}, rows), err,
-      el("div", {class: "actions"},
-        el("div", {class: "row", style: "display:flex;gap:8px;flex-wrap:wrap"},
-          el("button", {class: "btn", type: "button", text: "Change calendar", onclick: () => { close(); store.del("cal"); cal = null; months.clear(); events = []; chooseCalendar(); }}),
-          mode === "live" ? el("button", {class: "btn", type: "button", text: "Sign out", onclick: () => msalApp.logoutRedirect({account})}) : null),
-        el("button", {class: "btn primary", type: "button", text: "Save", onclick: () => {
-          for (const k of Object.keys(STATUS)) cats[k] = sels[k].value;
-          store.set("cats", cats); for (const m of months.values()) m.at = 0; close(); toast("Settings saved"); sync(true);
-        }})));
-  }
-  $("settingsBtn").onclick = () => openSettings();
-
-  async function loadCategories() {
-    master = mode === "demo"
-      ? [{displayName: "Red Category", color: "preset0"}, {displayName: "Yellow Category", color: "preset3"}, {displayName: "Green Category", color: "preset4"}, {displayName: "Partially Processed", color: "preset1"}]
-      : await graphAll("/me/outlook/masterCategories");
-    const saved = store.get("cats", null);
-    cats = {...CFG.categories};
-    if (saved) cats = {...cats, ...Object.fromEntries(Object.entries(saved).filter(([, v]) => v))};
-    const byColor = col => master.find(c => c.color === col)?.displayName || "";
-    if (!cats.scheduled) cats.scheduled = master.find(c => /red/i.test(c.displayName))?.displayName || byColor("preset0");
-    if (!cats.processed) cats.processed = master.find(c => /green/i.test(c.displayName))?.displayName || byColor("preset4");
-    if (!cats.partial) cats.partial = master.find(c => /partial/i.test(c.displayName))?.displayName || "";
-  }
-
-  // ---------- gate screens ----------
+  // ---- sign-in and first-time setup ----
   function gate(...content) { $("gate").replaceChildren(...content); $("gate").hidden = false; $("app").hidden = true; $("addBtn").hidden = true; }
-  function enterApp() {
-    $("gate").hidden = true; $("app").hidden = false; $("addBtn").hidden = false; $("who").hidden = false;
-    render(); sync(true);
-  }
-  const demoBtn = () => el("button", {class: "btn", text: "Preview with sample jobs", onclick: startDemo});
+  function enterApp() { $("gate").hidden = true; $("app").hidden = false; render(); load(); }
+  const storeGet = k => { try { return localStorage.getItem("fs." + k) || ""; } catch { return ""; } };
+  const storeSet = (k, v) => { try { localStorage.setItem("fs." + k, v); } catch {} };
 
-  async function chooseCalendar() {
-    gate(el("h3", {text: "Loading your calendars…"}));
-    let list = [];
-    try {
-      list = (await graphAll("/me/calendars?$select=id,name,owner,canEdit&$top=100")).map(c => ({path: `/me/calendars/${c.id}`, name: c.name, owner: c.owner?.name || "", canEdit: c.canEdit}));
-      if (CFG.calendar.mailbox) {
-        const mb = encodeURIComponent(CFG.calendar.mailbox);
-        try { list = (await graphAll(`/users/${mb}/calendars?$select=id,name,owner,canEdit&$top=100`)).map(c => ({path: `/users/${mb}/calendars/${c.id}`, name: c.name, owner: CFG.calendar.mailbox, canEdit: c.canEdit})).concat(list); } catch {}
-      }
-    } catch (e) { gate(el("h3", {text: "Couldn't load calendars"}), el("p", {text: e.message})); return; }
-    if (CFG.calendar.name) {
-      const hit = list.find(c => c.name.toLowerCase() === CFG.calendar.name.toLowerCase());
-      if (hit) { cal = hit; store.set("cal", cal); return enterApp(); }
+  async function findList(create) {
+    const name = CFG.listName.replace(/'/g, "''");
+    const found = await graph(`/sites/${siteId}/lists?$filter=displayName eq '${name}'&$select=id,displayName,webUrl`);
+    if (found.value?.length) return found.value[0].id;
+    if (!create) return "";
+    const made = await graph(`/sites/${siteId}/lists`, {method: "POST", extraScopes: ["Sites.Manage.All"], body: {
+      displayName: CFG.listName, list: {template: "genericList"},
+      columns: [
+        {name: "JobNo", displayName: "Job number", text: {}},
+        {name: "Crew", text: {}},
+        {name: "FieldDate", displayName: "Field date", text: {}},
+        {name: "EndDate", displayName: "Through", text: {}},
+        {name: "Location", text: {}},
+        {name: "Notes", text: {allowMultipleLines: true, textType: "plain"}},
+        {name: "Status", choice: {choices: ["Not processed", "Partially processed", "Processed"], displayAs: "dropDownMenu"}, defaultValue: {value: "Not processed"}},
+      ]}});
+    return made.id;
+  }
+
+  async function openSite(sitePathOrId, {setup} = {}) {
+    const s = await graph(`/sites/${sitePathOrId}?$select=id,webUrl,displayName`);
+    siteId = s.id; siteUrl = s.webUrl;
+    listId = await findList(false);
+    if (!listId && setup) {
+      gate(el("h3", {text: "Create the schedule list?"}),
+        el("p", {text: `There's no "${CFG.listName}" list on ${s.displayName} yet. Creating it adds one SharePoint list with columns for job number, crew, dates, location, notes and status.`}),
+        el("div", {class: "row"},
+          el("button", {class: "btn primary", text: "Create list", onclick: async e => {
+            e.currentTarget.disabled = true;
+            try { listId = await findList(true); storeSet("site", siteId); showSetupDone(); }
+            catch (x) { e.currentTarget.disabled = false; gateError(x.status === 403 ? "You don't have permission to create lists on that site. Pick a site you own, or ask its owner." : x.message); }
+          }}),
+          el("button", {class: "btn", text: "Pick a different site", onclick: chooseSite})));
+      return false;
     }
-    const mbInput = el("input", {id: "mbx", type: "email", placeholder: "survey@welchcomer.com"});
-    const mbErr = el("p", {class: "err", hidden: true});
-    gate(
-      el("h3", {text: "Which calendar is the field schedule?"}),
-      el("p", {text: "Pick the department calendar. If it isn't listed, open it once in Outlook (Add Calendar → From Directory), then reload this page."}),
-      el("div", {class: "callist"}, list.map(c => el("button", {onclick: () => { cal = c; store.set("cal", c); enterApp(); }},
-        el("span", {}, c.name, el("br"), el("small", {text: c.owner || ""})),
-        el("small", {text: c.canEdit ? "Can edit" : "View only"})))),
-      el("p", {class: "notice", text: "Or, if it lives in a shared mailbox you have access to:"}),
-      el("div", {class: "row"}, el("div", {style: "flex:1;min-width:200px"}, mbInput),
-        el("button", {class: "btn", text: "Look up", onclick: async () => {
-          mbErr.hidden = true; const mb = encodeURIComponent(mbInput.value.trim()); if (!mb) return;
-          try {
-            const cs = await graphAll(`/users/${mb}/calendars?$select=id,name,canEdit&$top=100`);
-            const box = $("gate").querySelector(".callist");
-            box.prepend(...cs.map(c => el("button", {onclick: () => { cal = {path: `/users/${mb}/calendars/${c.id}`, name: c.name, owner: decodeURIComponent(mb), canEdit: c.canEdit}; store.set("cal", cal); enterApp(); }},
-              el("span", {}, c.name, el("br"), el("small", {text: decodeURIComponent(mb)})), el("small", {text: c.canEdit ? "Can edit" : "View only"}))));
-          } catch (e) { mbErr.textContent = "No access to that mailbox's calendars (" + e.message + ")."; mbErr.hidden = false; }
-        }})), mbErr);
+    if (!listId) { gate(el("h3", {text: "The schedule isn't set up yet"}), el("p", {text: `Couldn't find the "${CFG.listName}" list on the configured SharePoint site. Ask Tom to finish setup.`})); return false; }
+    return true;
+  }
+  function gateError(msg) { const p = el("p", {class: "err", text: msg}); $("gate").append(p); }
+  function showSetupDone() {
+    gate(el("h3", {text: "Schedule list ready"}),
+      el("p", {text: "So everyone opens the same schedule without picking a site, put this site address in the page's settings (send it to Claude, or paste it into site: at the top of index.html):"}),
+      el("div", {class: "code", text: siteUrl.replace(/^https:\/\//, "").replace(/\/sites\//, ":/sites/").replace(/\/teams\//, ":/teams/")}),
+      el("div", {class: "row"}, el("button", {class: "btn primary", text: "Open the schedule", onclick: enterApp})));
   }
 
-  // ---------- demo data (made-up) ----------
-  function demoMonth(key) {
-    const [y, m] = key.split("-").map(Number), out = [];
-    const t = new Date(), crews = ["AB", "CD", "AB/CD", "EF", "CD/EF"];
-    const names = ["Topo", "Boundary Survey", "ROW Staking", "Mon Search", "Control Network", "As-Built", "Utility Locate Shots", "Pond As-Built", "Curb Staking"];
-    const days = new Date(y, m, 0).getDate();
-    let seed = y * 100 + m; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
-    for (let d = 1; d <= days; d++) {
-      const date = new Date(y, m-1, d); if (date.getDay() === 0 || date.getDay() === 6) continue;
-      const n = 1 + Math.floor(rnd() * 2.4);
-      for (let i = 0; i < n; i++) {
-        const ds = ymd(date), past = ds < ymd(t);
-        const r = rnd(), cat = past ? (r < .55 ? "Green Category" : r < .75 ? "Partially Processed" : "Red Category") : "Red Category";
-        const no = `${40000 + Math.floor(rnd()*9000)}.${pad(Math.floor(rnd()*30))}${rnd() < .5 ? ".0" : ""}`;
-        const span = rnd() < .12 ? 2 : 1;
-        out.push(normalize({id: `demo-${ds}-${i}`, subject: `${crews[Math.floor(rnd()*crews.length)]} - ${no} Sample ${names[Math.floor(rnd()*names.length)]}`,
-          isAllDay: true, start: {dateTime: ds + "T00:00:00"}, end: {dateTime: ymd(addDays(date, span)) + "T00:00:00"}, categories: [cat], location: {displayName: ""}}));
-      }
-      if (rnd() < .25) out.push(normalize({id: `demo-off-${d}`, subject: `${["AB","EF"][Math.floor(rnd()*2)]} - OFF`, isAllDay: true,
-        start: {dateTime: ymd(date) + "T00:00:00"}, end: {dateTime: ymd(addDays(date, 1)) + "T00:00:00"}, categories: ["Yellow Category"]}));
-      if (date.getDay() === 3) out.push(normalize({id: `demo-mtg-${d}`, subject: "Weekly survey meeting", isAllDay: false,
-        start: {dateTime: ymd(date) + "T15:30:00"}, end: {dateTime: ymd(date) + "T16:30:00"}, categories: []}));
-    }
-    return out;
+  async function chooseSite() {
+    const q = el("input", {id: "siteq", type: "search", placeholder: "Search SharePoint sites, e.g. Survey"});
+    const list = el("div", {class: "sitelist"});
+    const run = async () => {
+      list.replaceChildren(el("p", {class: "notice", text: "Searching…"}));
+      try {
+        const r = await graph(`/sites?search=${encodeURIComponent(q.value.trim() || "*")}&$select=id,displayName,webUrl&$top=25`);
+        const sites = (r.value || []).filter(s => s.webUrl && !/-my\.sharepoint\.com/.test(s.webUrl));
+        list.replaceChildren(...(sites.length ? sites.map(s => el("button", {onclick: async () => {
+            try { if (await openSite(s.id, {setup: true})) { storeSet("site", siteId); enterApp(); } } catch (x) { gateError(x.message); }
+          }}, el("strong", {text: s.displayName || s.webUrl}), el("small", {text: s.webUrl})))
+          : [el("p", {class: "notice", text: "No sites found. Try another word."})]));
+      } catch (x) { list.replaceChildren(el("p", {class: "err", text: "Couldn't search sites: " + x.message})); }
+    };
+    q.addEventListener("keydown", e => { if (e.key === "Enter") run(); });
+    gate(el("h3", {text: "Where should the schedule live?"}),
+      el("p", {text: "Pick the SharePoint site for the survey department (each Teams team has one). The job list is saved there, and anyone with access to that site can use the schedule."}),
+      el("div", {class: "row"}, q, el("button", {class: "btn", text: "Search", onclick: run})), list);
+    run();
   }
-  async function startDemo() {
-    mode = "demo"; $("demoBar").hidden = false; $("whoName").textContent = "Preview";
-    cal = {path: "", name: "Sample field calendar", owner: "", canEdit: true};
-    months.clear(); await loadCategories(); enterApp();
-  }
-  $("exitDemo").onclick = () => { location.reload(); };
 
-  // ---------- boot ----------
   async function boot() {
-    if (!CFG.clientId || typeof msal === "undefined") {
-      gate(el("h3", {text: "Almost ready"}),
-        el("p", {text: typeof msal === "undefined"
-          ? "The Microsoft sign-in library didn't load. Make sure msal-browser.min.js was uploaded next to index.html."
-          : "This page still needs the Microsoft 365 app registration filled in at the top of the file (clientId and tenantId). SETUP.md walks through it."}),
-        el("div", {class: "row"}, demoBtn()));
-      return;
-    }
+    if (typeof msal === "undefined") { gate(el("h3", {text: "Couldn't start"}), el("p", {text: "The Microsoft sign-in library didn't load. Make sure msal-browser.min.js was uploaded next to index.html."})); return; }
     msalApp = new msal.PublicClientApplication({
-      auth: {clientId: CFG.clientId, authority: "https://login.microsoftonline.com/" + CFG.tenantId, redirectUri: location.origin + location.pathname},
-      cache: {cacheLocation: "localStorage"},
-    });
-    try {
-      const res = await msalApp.handleRedirectPromise();
-      account = res?.account || msalApp.getAllAccounts()[0] || null;
-    } catch (e) { gate(el("h3", {text: "Sign-in didn't finish"}), el("p", {text: e.message}), el("div", {class: "row"}, el("button", {class: "btn primary", text: "Try again", onclick: signIn}))); return; }
+      auth: {clientId: CFG.clientId, authority: "https://login.microsoftonline.com/" + CFG.tenantId,
+             redirectUri: location.origin + location.pathname.replace(/index\.html$/, "")},
+      cache: {cacheLocation: "localStorage"}});
+    try { const res = await msalApp.handleRedirectPromise(); account = res?.account || msalApp.getAllAccounts()[0] || null; }
+    catch (e) { gate(el("h3", {text: "Sign-in didn't finish"}), el("p", {text: e.message}), el("div", {class: "row"}, el("button", {class: "btn primary", text: "Try again", onclick: signIn}))); return; }
     if (!account) {
       gate(el("h3", {text: "Sign in to see the field schedule"}),
-        el("p", {text: "Use your Welch Comer Microsoft account. The schedule comes straight from the department's Outlook calendar, and status changes show up in Outlook too."}),
-        el("div", {class: "row"}, el("button", {class: "btn primary", text: "Sign in with Microsoft", onclick: signIn}), demoBtn()));
+        el("p", {text: "Use your Welch Comer Microsoft account."}),
+        el("div", {class: "row"}, el("button", {class: "btn primary", text: "Sign in with Microsoft", onclick: signIn})));
       return;
     }
     msalApp.setActiveAccount(account);
-    $("whoName").textContent = account.name || account.username;
-    try { await loadCategories(); } catch (e) { master = []; cats = {...CFG.categories, ...(store.get("cats", {}))}; }
-    cal = store.get("cal", null);
-    if (cal) enterApp(); else chooseCalendar();
+    $("whoName").textContent = account.name || account.username; $("who").hidden = false;
+    gate(el("h3", {text: "Loading the schedule…"}));
+    try {
+      const site = CFG.site || storeGet("site");
+      if (!site) return chooseSite();
+      if (await openSite(site, {setup: !CFG.site})) enterApp();
+    } catch (e) {
+      if (!CFG.site) return chooseSite();
+      gate(el("h3", {text: "Couldn't open the schedule"}), el("p", {text: e.status === 403 || e.status === 404
+        ? "You don't have access to the schedule's SharePoint site. Ask the site owner to add you." : e.message}));
+    }
   }
   function signIn() { msalApp.loginRedirect({scopes: SCOPES, prompt: "select_account"}); }
+  $("signOut").onclick = () => msalApp.logoutRedirect({account});
 
-  setInterval(() => { if (!document.hidden && cal && mode === "live") sync(true); }, 120_000);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && cal && mode === "live") sync(true); });
-
-  window.__fs_test = {parseSubject};
+  setInterval(() => { if (!document.hidden && listId && !$("sheetHost").firstChild) load(); }, 60_000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && listId) load(); });
+  render();
   boot();
 })();
 </script>
