@@ -13,10 +13,9 @@
 window.FIELD_SCHEDULE_CONFIG = {
   clientId: "500b98fb-d49d-4a26-ac47-ed6fe1eaa3df",
   tenantId: "a7c116b0-6582-487e-91ab-bf679445ed43",
-  // SharePoint site that holds the "Field Schedule" list, e.g. "welchcomer.sharepoint.com:/sites/Survey".
-  // Leave blank and the first person to sign in picks the site (and creates the list).
-  site: "",
-  listName: "Field Schedule"
+  // From IT after they grant the app read access to the list (see SETUP.md)
+  siteId: "",
+  listId: ""
 };
 </script>
 <style>
@@ -141,6 +140,12 @@ h1{font-family:var(--font-display);font-weight:700;font-size:32px;line-height:1;
 .linkbtn{border:0;background:none;padding:0;color:var(--accent);font-weight:600;font-size:13px}
 .syncline{font-size:12.5px;color:var(--muted);text-align:right}
 
+dl.facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;margin:0;font-size:14.5px}
+dl.facts dt{color:var(--muted);font-weight:600;font-size:12.5px;padding-top:2px}
+dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
+a.btn{text-decoration:none;color:inherit;display:inline-flex;align-items:center;justify-content:center}
+a.btn.primary{color:var(--accent-ink)}
+
 /* fab */
 .fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));border-radius:99px;padding:13px 20px;box-shadow:0 6px 18px rgb(0 0 0 / .22);font-size:16px;z-index:5}
 
@@ -202,7 +207,7 @@ textarea{min-height:70px;resize:vertical}
 
 </div>
 
-<button class="btn primary fab" id="addBtn" hidden>+ Add job</button>
+<a class="btn primary fab" id="addBtn" hidden target="_blank" rel="noopener">+ Add in SharePoint</a>
 <div id="sheetHost"></div>
 <div class="toast" id="toast" hidden></div>
 
@@ -240,11 +245,11 @@ textarea{min-height:70px;resize:vertical}
   // ---- state ----
   const CFG = window.FIELD_SCHEDULE_CONFIG;
   const GRAPH = "https://graph.microsoft.com/v1.0";
-  const SCOPES = ["User.Read", "Sites.ReadWrite.All"];
+  const SCOPES = ["User.Read", "Lists.SelectedOperations.Selected"];
   const LABEL_TO_KEY = {"Not processed": "scheduled", "Partially processed": "partial", "Processed": "processed"};
-  let msalApp = null, account = null, siteId = "", listId = "", siteUrl = "";
+  let msalApp = null, account = null, siteId = CFG.siteId, listId = CFG.listId, listUrl = "";
   let jobs = [];           // [{id, ...data}]
-  let loaded = false, canWrite = true;
+  let loaded = false;
   let view = "week", anchor = new Date(), filter = "all";
   try { const v = localStorage.getItem("fs.view"); if (v === "week" || v === "month") view = v; } catch {}
 
@@ -288,7 +293,7 @@ textarea{min-height:70px;resize:vertical}
     const st = STATUS[j.status] || STATUS.scheduled;
     const multi = j.endDate && j.endDate > j.date;
     const meta = [j.crew, j.location].filter(Boolean).join(" · ");
-    return el("button", {class:`job ${st.cls}`, onclick: () => openSheet(j)},
+    return el("button", {class:`job ${st.cls}`, onclick: () => showDetails(j)},
       el("span", {class:"stripe", "aria-hidden":"true"}),
       el("span", {class:"main"},
         j.jobNo ? el("span", {class:"no", text: j.jobNo}) : null,
@@ -307,12 +312,12 @@ textarea{min-height:70px;resize:vertical}
     for (let i = 0; i < 7; i++) {
       const d = addDays(start, i), ds = ymd(d);
       const list = jobs.filter(j => covers(j, ds) && passes(j)).sort(byOrder);
-      const dayOffs = offs.filter(o => covers(o, ds)).sort((a, b) => a.crew.localeCompare(b.crew));
+      const dayOffs = offs.filter(o => covers(o, ds)).sort((a, b) => (a.crew || "").localeCompare(b.crew || ""));
       const isWeekend = i >= 5;
       if (isWeekend && !list.length && !dayOffs.length && ds !== t) continue;
       days.push(el("section", {class: "day" + (ds === t ? " today" : "")},
         el("h2", {}, el("span", {text: fmtDay(d)}),
-          dayOffs.map(o => el("button", {class: "offchip", title: o.notes || "", onclick: () => openOffSheet(o), text: offLabel(o)}))),
+          dayOffs.map(o => el("button", {class: "offchip", title: o.notes || "", onclick: () => showDetails(o), text: offLabel(o)}))),
         list.length ? el("div", {class:"jobs"}, list.map(j => jobCard(j, ds)))
                     : el("div", {class:"none", text: "No field work scheduled"})));
     }
@@ -333,10 +338,10 @@ textarea{min-height:70px;resize:vertical}
       cells.push(el("div", {class:"cell" + (d.getMonth() !== first.getMonth() ? " out" : "") + (ds === t ? " today" : "")},
         el("button", {class:"d", text: d.getDate(), "aria-label": `Open week of ${fmtDay(d)}`,
           onclick: () => { anchor = day; setView("week"); }}),
-        offs.filter(o => covers(o, ds)).map(o => el("button", {class: "offchip", title: o.notes || offLabel(o), onclick: () => openOffSheet(o), text: offLabel(o)})),
+        offs.filter(o => covers(o, ds)).map(o => el("button", {class: "offchip", title: o.notes || offLabel(o), onclick: () => showDetails(o), text: offLabel(o)})),
         list.map(j => el("button", {class:`chip ${(STATUS[j.status]||STATUS.scheduled).cls}`,
           title: [j.crew, j.jobNo, j.title].filter(Boolean).join(" · ") + " — " + (STATUS[j.status]||STATUS.scheduled).label,
-          onclick: () => openSheet(j)},
+          onclick: () => showDetails(j)},
           j.crew ? el("b", {text: j.crew + " "}) : null, [j.jobNo, j.title || "Untitled"].filter(Boolean).join(" ")))));
     }
     return el("div", {class:"month-wrap"}, el("div", {class:"month"}, cells));
@@ -346,10 +351,10 @@ textarea{min-height:70px;resize:vertical}
     return el("div", {class:"empty"},
       el("h3", {text: loaded ? "No jobs on the schedule yet" : "Loading the schedule…"}),
       el("p", {text: loaded
-        ? "Add the first field job with the + Add job button. New jobs start red until the office processes the field data."
+        ? "Jobs and time off are added in the Field Schedule list in SharePoint. They show up here within a minute."
         : "Jobs appear here once the shared schedule loads."}),
-      loaded && canWrite ? el("div", {class:"row"},
-        el("button", {class:"btn primary", text:"+ Add job", onclick: () => openSheet(null)})) : null);
+      loaded && listUrl ? el("div", {class:"row"},
+        el("a", {class:"btn primary", href: listUrl + "/NewForm.aspx", target: "_blank", rel: "noopener", text:"+ Add in SharePoint"})) : null);
   }
 
   function render() {
@@ -358,7 +363,7 @@ textarea{min-height:70px;resize:vertical}
     $("vMonth").setAttribute("aria-pressed", String(view === "month"));
     const body = view === "week" ? renderWeek() : renderMonth();
     $("view").replaceChildren(!jobs.length && !offs.length ? renderEmpty() : body);
-    $("addBtn").hidden = !canWrite;
+    $("addBtn").hidden = !listUrl;
   }
   function setView(v) { view = v; try { localStorage.setItem("fs.view", v); } catch {} render(); }
 
@@ -367,178 +372,50 @@ textarea{min-height:70px;resize:vertical}
   $("todayBtn").onclick = () => { anchor = new Date(); render(); };
   $("prev").onclick = () => { anchor = view === "week" ? addDays(anchor, -7) : new Date(anchor.getFullYear(), anchor.getMonth()-1, 1); render(); };
   $("next").onclick = () => { anchor = view === "week" ? addDays(anchor, 7) : new Date(anchor.getFullYear(), anchor.getMonth()+1, 1); render(); };
-  $("addBtn").onclick = () => openSheet(null);
 
   // ---- toast ----
   let toastT;
   function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
 
-  // ---- editor sheet ----
-  async function openSheet(job) {
-    const isNew = !job;
-    const draft = isNew ? {status:"scheduled", date: ymd(view === "week" && mondayOf(anchor) > new Date() ? mondayOf(anchor) : new Date())} : {...job};
-    const statusBtns = Object.entries(STATUS).map(([k, s]) =>
-      el("button", {type:"button", class: s.cls, "aria-pressed": String(draft.status === k), disabled: !canWrite,
-        onclick: e => { draft.status = k; statusBtns.forEach(b => b.setAttribute("aria-pressed", String(b === e.currentTarget))); }},
-        s.label));
-    const f = id => el("input", {id, value: draft[id.replace("f_","")] || "", disabled: !canWrite});
-    const iJob = f("f_jobNo"), iTitle = f("f_title"), iCrew = f("f_crew"), iLoc = f("f_location");
-    const iDate = el("input", {id:"f_date", type:"date", value: draft.date || "", disabled: !canWrite, required: true});
-    const iEnd = el("input", {id:"f_endDate", type:"date", value: draft.endDate || "", disabled: !canWrite});
-    const iNotes = el("textarea", {id:"f_notes", disabled: !canWrite}); iNotes.value = draft.notes || "";
-    iJob.placeholder = "e.g. 26-1142"; iTitle.placeholder = "Job name or site"; iCrew.placeholder = "Crew or party chief"; iLoc.placeholder = "Address, township/range, etc.";
-    const err = el("p", {class:"err", hidden: true});
-    const stamp = el("p", {class:"stamp", hidden: true});
-    const confirmBox = el("div", {class:"confirm", hidden: true},
-      el("span", {text:"Delete this job for everyone?"}),
-      el("button", {class:"btn danger", type:"button", text:"Delete", onclick: doDelete}),
-      el("button", {class:"btn", type:"button", text:"Keep", onclick: () => confirmBox.hidden = true}));
-
-    const save = el("button", {class:"btn primary", type:"submit", text: isNew ? "Add job" : "Save", hidden: !canWrite});
-    const form = el("form", {class:"sheet", role:"dialog", "aria-modal":"true", "aria-label": isNew ? "Add job" : "Edit job"},
-      el("h3", {text: isNew ? "Add field job" : (job.title || "Job")}),
-      isNew ? el("div", {class: "kindset", role: "group", "aria-label": "Entry type"},
-        el("button", {type: "button", "aria-pressed": "true", text: "Field job"}),
-        el("button", {type: "button", "aria-pressed": "false", text: "Time off", onclick: () => { close(); openOffSheet(null, {date: iDate.value, crew: iCrew.value}); }})) : null,
-      el("div", {class:"statusset", role:"group", "aria-label":"Processing status"}, statusBtns),
-      el("div", {class:"fields"},
-        el("label", {for:"f_jobNo"}, "Job number", iJob),
-        el("label", {for:"f_crew"}, "Crew", iCrew),
-        el("label", {class:"full", for:"f_title"}, "Job", iTitle),
-        el("label", {for:"f_date"}, "Field date", iDate),
-        el("label", {for:"f_endDate"}, "Through (optional)", iEnd),
-        el("label", {class:"full", for:"f_location"}, "Location", iLoc),
-        el("label", {class:"full", for:"f_notes"}, "Office notes", iNotes)),
-      stamp, err, confirmBox,
-      el("div", {class:"actions"},
-        !isNew && canWrite ? el("button", {class:"btn danger", type:"button", text:"Delete", onclick: () => confirmBox.hidden = false}) : el("span"),
-        el("div", {class:"right"}, el("button", {class:"btn", type:"button", text: canWrite ? "Cancel" : "Close", onclick: close}), save)));
-
-    const scrim = el("div", {class:"scrim", onclick: e => { if (e.target === scrim) close(); }}, form);
-    const onKey = e => { if (e.key === "Escape") close(); };
-    function close() { scrim.remove(); document.removeEventListener("keydown", onKey); }
-    document.addEventListener("keydown", onKey);
-    $("sheetHost").replaceChildren(scrim);
-    (isNew ? iTitle : statusBtns.find(b => b.getAttribute("aria-pressed") === "true"))?.focus();
-
-    if (!isNew && job.updatedByName) {
-      const who = job.updatedByName;
-      const when = job.updatedAt ? new Date(job.updatedAt).toLocaleString(undefined,{month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}) : "";
-      stamp.textContent = `Last updated by ${who}${when ? " · " + when : ""}`;
-      stamp.hidden = false;
-    }
-
-    form.addEventListener("submit", async e => {
-      e.preventDefault();
-      err.hidden = true;
-      const data = {
-        status: draft.status || "scheduled",
-        jobNo: iJob.value.trim(), title: iTitle.value.trim(), crew: iCrew.value.trim(),
-        location: iLoc.value.trim(), notes: iNotes.value.trim(),
-        date: iDate.value, endDate: iEnd.value && iEnd.value > iDate.value ? iEnd.value : "",
-      };
-      if (!data.date) { err.textContent = "Pick a field date."; err.hidden = false; return; }
-      if (!data.title && !data.jobNo) { err.textContent = "Enter a job name or job number."; err.hidden = false; return; }
-      save.disabled = true;
-      try {
-        if (isNew) await graph(`${itemsPath()}`, {method: "POST", body: {fields: toFields(data)}});
-        else await graph(`${itemsPath()}/${job.id}/fields`, {method: "PATCH", body: toFields(data)});
-        close(); toast(isNew ? "Job added" : "Saved"); load();
-      } catch (ex) {
-        save.disabled = false;
-        err.textContent = ex && ex.status === 403
-          ? "You can view the schedule but not change it. Ask the SharePoint site owner for Edit access."
-          : "Couldn't save: " + ((ex && ex.message) || "check your connection and try again.");
-        err.hidden = false;
-        if (ex && ex.status === 403) { canWrite = false; render(); }
-      }
-    });
-
-    async function doDelete() {
-      try { await graph(`${itemsPath()}/${job.id}`, {method: "DELETE"}); close(); toast("Job deleted"); load(); }
-      catch { err.textContent = "Couldn't delete this job. Try again."; err.hidden = false; }
-    }
-  }
-
-  // ---- time-off sheet ----
-  function openOffSheet(entry, seed = {}) {
-    const isNew = !entry;
-    const d = isNew ? {type: "Off", crew: seed.crew || "", date: seed.date || todayStr(), endDate: "", notes: ""} : {...entry};
-    const types = [["Off", "All day"], ["Out", "Part of the day"]].map(([k, sub]) =>
-      el("button", {type: "button", "aria-pressed": String(d.type === k), disabled: !canWrite,
-        onclick: e => { d.type = k; types.forEach(b => b.setAttribute("aria-pressed", String(b === e.currentTarget))); }},
-        k, el("small", {text: sub})));
-    const iWho = el("input", {id: "o_crew", value: d.crew, placeholder: "Initials, e.g. TM", autocapitalize: "characters", disabled: !canWrite});
-    const iFrom = el("input", {id: "o_date", type: "date", value: d.date, disabled: !canWrite});
-    const iTo = el("input", {id: "o_end", type: "date", value: d.endDate, disabled: !canWrite});
-    const iNote = el("textarea", {id: "o_notes", placeholder: "Optional, e.g. back at 1pm", disabled: !canWrite}); iNote.value = d.notes || "";
-    const err = el("p", {class: "err", hidden: true});
-    const confirmBox = el("div", {class: "confirm", hidden: true},
-      el("span", {text: "Remove this time off?"}),
-      el("button", {class: "btn danger", type: "button", text: "Remove", onclick: doDelete}),
-      el("button", {class: "btn", type: "button", text: "Keep", onclick: () => confirmBox.hidden = true}));
-    const save = el("button", {class: "btn primary", type: "submit", text: isNew ? "Add time off" : "Save", hidden: !canWrite});
-    const form = el("form", {class: "sheet", role: "dialog", "aria-modal": "true", "aria-label": isNew ? "Add time off" : "Time off"},
-      el("h3", {text: isNew ? "Add time off" : offLabel(d)}),
-      isNew ? el("div", {class: "kindset", role: "group", "aria-label": "Entry type"},
-        el("button", {type: "button", "aria-pressed": "false", text: "Field job", onclick: () => { close(); openSheet(null); }}),
-        el("button", {type: "button", "aria-pressed": "true", text: "Time off"})) : null,
-      el("div", {class: "typeset", role: "group", "aria-label": "Type"}, types),
-      el("div", {class: "fields"},
-        el("label", {class: "full", for: "o_crew"}, "Who", iWho),
-        el("label", {for: "o_date"}, "From", iFrom),
-        el("label", {for: "o_end"}, "Through (optional)", iTo),
-        el("label", {class: "full", for: "o_notes"}, "Note", iNote)),
-      err, confirmBox,
+  // ---- details (read-only; editing happens in SharePoint) ----
+  function showDetails(e) {
+    const isOff = !!e.offType;
+    const st = isOff ? null : (STATUS[e.status] || STATUS.scheduled);
+    const fmtD = v => fmtDay(parse(v));
+    const row = (k, v) => v ? [el("dt", {text: k}), el("dd", {text: v})] : null;
+    const when = e.updatedAt ? new Date(e.updatedAt).toLocaleString(undefined, {month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}) : "";
+    const box = el("div", {class: "sheet", role: "dialog", "aria-modal": "true", "aria-label": "Details"},
+      el("h3", {text: isOff ? offLabel(e) : (e.title || "Untitled job")}),
+      st ? el("span", {class: `pill ${st.cls}`, style: "align-self:flex-start"}, el("span", {class: "lbl", text: st.label})) : null,
+      el("dl", {class: "facts"},
+        row("Job", e.jobNo), row("Crew", isOff ? "" : e.crew), row(isOff ? "Who" : "", isOff ? e.crew : ""),
+        row("Date", fmtD(e.date) + (e.endDate ? " – " + fmtD(e.endDate) : "")),
+        row("Location", e.location), row("Notes", e.notes)),
+      e.updatedByName ? el("p", {class: "stamp", text: `Last updated by ${e.updatedByName}${when ? " · " + when : ""}`}) : null,
       el("div", {class: "actions"},
-        !isNew && canWrite ? el("button", {class: "btn danger", type: "button", text: "Remove", onclick: () => confirmBox.hidden = false}) : el("span"),
-        el("div", {class: "right"}, el("button", {class: "btn", type: "button", text: canWrite ? "Cancel" : "Close", onclick: () => close()}), save)));
-    const scrim = el("div", {class: "scrim", onclick: e => { if (e.target === scrim) close(); }}, form);
-    const onKey = e => { if (e.key === "Escape") close(); };
+        e.webUrl ? el("a", {class: "btn primary", href: e.webUrl, target: "_blank", rel: "noopener", text: "Edit in SharePoint"}) : el("span"),
+        el("button", {class: "btn", type: "button", text: "Close", onclick: () => close()})));
+    const scrim = el("div", {class: "scrim", onclick: ev => { if (ev.target === scrim) close(); }}, box);
+    const onKey = ev => { if (ev.key === "Escape") close(); };
     function close() { scrim.remove(); document.removeEventListener("keydown", onKey); }
     document.addEventListener("keydown", onKey);
     $("sheetHost").replaceChildren(scrim);
-    iWho.focus();
-
-    form.addEventListener("submit", async e => {
-      e.preventDefault(); err.hidden = true;
-      const crew = iWho.value.trim().toUpperCase();
-      if (!crew || !iFrom.value) { err.textContent = "Enter who is off and the first day."; err.hidden = false; return; }
-      const fields = {Title: d.type, Crew: crew, FieldDate: iFrom.value, EndDate: iTo.value && iTo.value > iFrom.value ? iTo.value : "",
-        Notes: iNote.value.trim(), JobNo: "", Location: "", Status: "Time off"};
-      save.disabled = true;
-      try {
-        if (isNew) await graph(itemsPath(), {method: "POST", body: {fields}});
-        else await graph(`${itemsPath()}/${entry.id}/fields`, {method: "PATCH", body: fields});
-        close(); toast(isNew ? "Time off added" : "Saved"); load();
-      } catch (ex) {
-        save.disabled = false;
-        err.textContent = ex && ex.status === 403 ? "You can view the schedule but not change it. Ask the SharePoint site owner for Edit access."
-          : "Couldn't save: " + ((ex && ex.message) || "check your connection and try again.");
-        err.hidden = false;
-      }
-    });
-    async function doDelete() {
-      try { await graph(`${itemsPath()}/${entry.id}`, {method: "DELETE"}); close(); toast("Time off removed"); load(); }
-      catch { err.textContent = "Couldn't remove it. Try again."; err.hidden = false; }
-    }
   }
 
   // ---- Microsoft Graph ----
-  async function token(extra) {
-    const req = {scopes: extra ? SCOPES.concat(extra) : SCOPES, account};
+  async function token() {
+    const req = {scopes: SCOPES, account};
     try { return (await msalApp.acquireTokenSilent(req)).accessToken; }
     catch (e) {
       if (e instanceof msal.InteractionRequiredAuthError) { await msalApp.acquireTokenRedirect(req); return new Promise(() => {}); }
       throw e;
     }
   }
-  async function graph(path, opts = {}) {
+  async function graph(path) {
     const url = path.startsWith("http") ? path : GRAPH + path;
     for (let attempt = 0; attempt < 3; attempt++) {
-      const res = await fetch(url, {method: opts.method || "GET",
-        headers: {Authorization: "Bearer " + await token(opts.extraScopes), "Content-Type": "application/json"},
-        body: opts.body ? JSON.stringify(opts.body) : undefined});
+      // This page only ever reads. It never sends POST, PATCH or DELETE requests.
+      const res = await fetch(url, {method: "GET", headers: {Authorization: "Bearer " + await token()}});
       if (res.status === 429 || res.status === 503) { await new Promise(r => setTimeout(r, (Number(res.headers.get("Retry-After")) || 2) * 1000)); continue; }
       if (!res.ok) {
         let msg = res.statusText; try { msg = (await res.json()).error?.message || msg; } catch {}
@@ -549,30 +426,31 @@ textarea{min-height:70px;resize:vertical}
     const err = new Error("Microsoft 365 is busy. Try again in a minute."); err.status = 429; throw err;
   }
   const itemsPath = () => `/sites/${siteId}/lists/${listId}/items`;
-  const toFields = d => ({Title: d.title, JobNo: d.jobNo, Crew: d.crew, FieldDate: d.date, EndDate: d.endDate,
-    Location: d.location, Notes: d.notes, Status: STATUS[d.status].label});
-  const fromItem = it => { const f = it.fields || {}; return {id: it.id, title: f.Title || "", jobNo: f.JobNo || "", crew: f.Crew || "",
-    date: f.FieldDate || "", endDate: f.EndDate || "", location: f.Location || "", notes: f.Notes || "",
-    status: LABEL_TO_KEY[f.Status] || "scheduled",
+  // SharePoint date columns come back as UTC timestamps; convert to the viewer's local calendar day
+  const toYmd = v => { if (!v) return ""; if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v; const d = new Date(v); return isNaN(d) ? "" : ymd(d); };
+  const OFF_STATUSES = ["Off", "Out", "Time off"];
+  const fromItem = it => { const f = it.fields || {}; return {id: it.id, webUrl: it.webUrl || "", title: f.Title || "", jobNo: f.JobNo || "", crew: f.Crew || "",
+    date: toYmd(f.FieldDate), endDate: toYmd(f.EndDate), location: f.Location || "", notes: f.Notes || "",
+    status: LABEL_TO_KEY[f.Status] || "scheduled", offType: OFF_STATUSES.includes(f.Status) ? (f.Status === "Time off" ? (f.Title || "Off") : f.Status) : "",
     updatedByName: it.lastModifiedBy?.user?.displayName || "", updatedAt: it.lastModifiedDateTime || ""}; };
 
   let loading = false;
   async function load() {
     if (loading || !listId) return; loading = true;
     try {
-      let next = `${itemsPath()}?$expand=fields($select=Title,JobNo,Crew,FieldDate,EndDate,Location,Notes,Status)&$top=999`, all = [];
+      let next = `${itemsPath()}?$select=id,webUrl,lastModifiedBy,lastModifiedDateTime&$expand=fields($select=Title,JobNo,Crew,FieldDate,EndDate,Location,Notes,Status)&$top=999`, all = [];
       while (next) { const page = await graph(next); all = all.concat(page.value || []); next = page["@odata.nextLink"]; }
-      const rows = all.filter(it => /^\d{4}-\d{2}-\d{2}$/.test(it.fields?.FieldDate || ""));
-      offs = rows.filter(it => it.fields.Status === "Time off").map(it => ({id: it.id, crew: it.fields.Crew || "", type: it.fields.Title || "Off",
-        date: it.fields.FieldDate, endDate: it.fields.EndDate || "", notes: it.fields.Notes || ""}));
-      jobs = rows.filter(it => it.fields.Status !== "Time off").map(fromItem);
+      const rows = all.map(fromItem).filter(e => e.date);
+      offs = rows.filter(e => e.offType).map(e => ({...e, type: e.offType}));
+      jobs = rows.filter(e => !e.offType);
+      if (!listUrl) { try { listUrl = (await graph(`/sites/${siteId}/lists/${listId}?$select=webUrl`)).webUrl || ""; } catch { listUrl = ""; } if (listUrl) $("addBtn").href = listUrl + "/NewForm.aspx"; }
       loaded = true; $("notice").hidden = true;
       $("syncLine").textContent = "Updated " + new Date().toLocaleTimeString(undefined, {hour: "numeric", minute: "2-digit"});
       render();
     } catch (e) {
       $("notice").hidden = false;
       $("notice").textContent = e.status === 403 || e.status === 404
-        ? "You don't have access to the schedule's SharePoint site. Ask the site owner to add you."
+        ? "You don't have access to the Field Schedule list. Ask the SharePoint site owner to add you."
         : "Couldn't load the schedule: " + e.message;
     } finally { loading = false; }
   }
@@ -580,75 +458,6 @@ textarea{min-height:70px;resize:vertical}
   // ---- sign-in and first-time setup ----
   function gate(...content) { $("gate").replaceChildren(...content); $("gate").hidden = false; $("app").hidden = true; $("addBtn").hidden = true; }
   function enterApp() { $("gate").hidden = true; $("app").hidden = false; render(); load(); }
-  const storeGet = k => { try { return localStorage.getItem("fs." + k) || ""; } catch { return ""; } };
-  const storeSet = (k, v) => { try { localStorage.setItem("fs." + k, v); } catch {} };
-
-  async function findList(create) {
-    const name = CFG.listName.replace(/'/g, "''");
-    const found = await graph(`/sites/${siteId}/lists?$filter=displayName eq '${name}'&$select=id,displayName,webUrl`);
-    if (found.value?.length) return found.value[0].id;
-    if (!create) return "";
-    const made = await graph(`/sites/${siteId}/lists`, {method: "POST", extraScopes: ["Sites.Manage.All"], body: {
-      displayName: CFG.listName, list: {template: "genericList"},
-      columns: [
-        {name: "JobNo", displayName: "Job number", text: {}},
-        {name: "Crew", text: {}},
-        {name: "FieldDate", displayName: "Field date", text: {}},
-        {name: "EndDate", displayName: "Through", text: {}},
-        {name: "Location", text: {}},
-        {name: "Notes", text: {allowMultipleLines: true, textType: "plain"}},
-        {name: "Status", choice: {choices: ["Not processed", "Partially processed", "Processed", "Time off"], displayAs: "dropDownMenu", allowTextEntry: true}, defaultValue: {value: "Not processed"}},
-      ]}});
-    return made.id;
-  }
-
-  async function openSite(sitePathOrId, {setup} = {}) {
-    const s = await graph(`/sites/${sitePathOrId}?$select=id,webUrl,displayName`);
-    siteId = s.id; siteUrl = s.webUrl;
-    listId = await findList(false);
-    if (!listId && setup) {
-      gate(el("h3", {text: "Create the schedule list?"}),
-        el("p", {text: `There's no "${CFG.listName}" list on ${s.displayName} yet. Creating it adds one SharePoint list with columns for job number, crew, dates, location, notes and status.`}),
-        el("div", {class: "row"},
-          el("button", {class: "btn primary", text: "Create list", onclick: async e => {
-            e.currentTarget.disabled = true;
-            try { listId = await findList(true); storeSet("site", siteId); showSetupDone(); }
-            catch (x) { e.currentTarget.disabled = false; gateError(x.status === 403 ? "You don't have permission to create lists on that site. Pick a site you own, or ask its owner." : x.message); }
-          }}),
-          el("button", {class: "btn", text: "Pick a different site", onclick: chooseSite})));
-      return false;
-    }
-    if (!listId) { gate(el("h3", {text: "The schedule isn't set up yet"}), el("p", {text: `Couldn't find the "${CFG.listName}" list on the configured SharePoint site. Ask Tom to finish setup.`})); return false; }
-    return true;
-  }
-  function gateError(msg) { const p = el("p", {class: "err", text: msg}); $("gate").append(p); }
-  function showSetupDone() {
-    gate(el("h3", {text: "Schedule list ready"}),
-      el("p", {text: "So everyone opens the same schedule without picking a site, put this site address in the page's settings (send it to Claude, or paste it into site: at the top of index.html):"}),
-      el("div", {class: "code", text: siteUrl.replace(/^https:\/\//, "").replace(/\/sites\//, ":/sites/").replace(/\/teams\//, ":/teams/")}),
-      el("div", {class: "row"}, el("button", {class: "btn primary", text: "Open the schedule", onclick: enterApp})));
-  }
-
-  async function chooseSite() {
-    const q = el("input", {id: "siteq", type: "search", placeholder: "Search SharePoint sites, e.g. Survey"});
-    const list = el("div", {class: "sitelist"});
-    const run = async () => {
-      list.replaceChildren(el("p", {class: "notice", text: "Searching…"}));
-      try {
-        const r = await graph(`/sites?search=${encodeURIComponent(q.value.trim() || "*")}&$select=id,displayName,webUrl&$top=25`);
-        const sites = (r.value || []).filter(s => s.webUrl && !/-my\.sharepoint\.com/.test(s.webUrl));
-        list.replaceChildren(...(sites.length ? sites.map(s => el("button", {onclick: async () => {
-            try { if (await openSite(s.id, {setup: true})) { storeSet("site", siteId); enterApp(); } } catch (x) { gateError(x.message); }
-          }}, el("strong", {text: s.displayName || s.webUrl}), el("small", {text: s.webUrl})))
-          : [el("p", {class: "notice", text: "No sites found. Try another word."})]));
-      } catch (x) { list.replaceChildren(el("p", {class: "err", text: "Couldn't search sites: " + x.message})); }
-    };
-    q.addEventListener("keydown", e => { if (e.key === "Enter") run(); });
-    gate(el("h3", {text: "Where should the schedule live?"}),
-      el("p", {text: "Pick the SharePoint site for the survey department (each Teams team has one). The job list is saved there, and anyone with access to that site can use the schedule."}),
-      el("div", {class: "row"}, q, el("button", {class: "btn", text: "Search", onclick: run})), list);
-    run();
-  }
 
   async function boot() {
     if (typeof msal === "undefined") { gate(el("h3", {text: "Couldn't start"}), el("p", {text: "The Microsoft sign-in library didn't load. Make sure msal-browser.min.js was uploaded next to index.html."})); return; }
@@ -666,16 +475,11 @@ textarea{min-height:70px;resize:vertical}
     }
     msalApp.setActiveAccount(account);
     $("whoName").textContent = account.name || account.username; $("who").hidden = false;
-    gate(el("h3", {text: "Loading the schedule…"}));
-    try {
-      const site = CFG.site || storeGet("site");
-      if (!site) return chooseSite();
-      if (await openSite(site, {setup: !CFG.site})) enterApp();
-    } catch (e) {
-      if (!CFG.site) return chooseSite();
-      gate(el("h3", {text: "Couldn't open the schedule"}), el("p", {text: e.status === 403 || e.status === 404
-        ? "You don't have access to the schedule's SharePoint site. Ask the site owner to add you." : e.message}));
+    if (!siteId || !listId) {
+      gate(el("h3", {text: "Almost ready"}), el("p", {text: "Sign-in works. The page is waiting for IT to give it read access to the Field Schedule list (siteId and listId in the settings at the top of index.html)."}));
+      return;
     }
+    enterApp();
   }
   function signIn() { msalApp.loginRedirect({scopes: SCOPES, prompt: "select_account"}); }
   $("signOut").onclick = () => msalApp.logoutRedirect({account});
