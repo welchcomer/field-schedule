@@ -74,7 +74,7 @@ h1{font-family:var(--font-display);font-weight:700;font-size:32px;line-height:1;
 
 /* week agenda */
 .days{display:flex;flex-direction:column;gap:14px}
-.day h2{margin:0 0 6px;font-family:var(--font-display);font-weight:600;font-size:16px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:baseline}
+.day h2{margin:0 0 6px;font-family:var(--font-display);font-weight:600;font-size:16px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .day.today h2{color:var(--accent)}
 .day.today h2::after{content:"Today";font-size:11px;letter-spacing:.1em;border:1px solid currentColor;border-radius:99px;padding:0 7px}
 .day .none{color:var(--muted);font-size:13.5px;padding:2px 0 0 2px}
@@ -106,6 +106,16 @@ h1{font-family:var(--font-display);font-weight:700;font-size:32px;line-height:1;
 .chip b{font-weight:700}
 @media (max-width:560px){.month{gap:2px}.cell{padding:2px;min-height:64px}.chip{font-size:10.5px;padding:2px 3px;border-left-width:3px;-webkit-line-clamp:4}}
 .more{font-size:11px;color:var(--muted);padding-left:2px}
+.offchip{border:1px dashed var(--line);background:var(--sunk);color:var(--muted);border-radius:99px;font-family:var(--font-body);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;padding:1px 9px}
+.offchip:hover{color:var(--ink)}
+.cell .offchip{font-size:10.5px;padding:1px 5px;text-align:left;border-radius:4px;width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.kindset{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.kindset button{border:0;background:var(--surface);padding:9px;font-weight:600;color:var(--muted)}
+.kindset button[aria-pressed="true"]{background:var(--sunk);color:var(--ink)}
+.typeset{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.typeset button{border:2px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 6px;font-weight:600;font-size:14px;line-height:1.2}
+.typeset button small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.typeset button[aria-pressed="true"]{border-color:var(--accent);background:var(--sunk)}
 
 /* empty / notices */
 .empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--radius);padding:22px 18px;display:flex;flex-direction:column;gap:10px}
@@ -238,6 +248,8 @@ textarea{min-height:70px;resize:vertical}
   let view = "week", anchor = new Date(), filter = "all";
   try { const v = localStorage.getItem("fs.view"); if (v === "week" || v === "month") view = v; } catch {}
 
+  let offs = [];           // time-off entries [{id, crew, type:"Off"|"Out", date, endDate, notes}]
+  const offLabel = o => `${o.crew || "Someone"} ${(o.type || "Off").toLowerCase()}`;
   const endOf = j => j.endDate && j.endDate >= j.date ? j.endDate : j.date;
   const covers = (j, day) => j.date <= day && endOf(j) >= day;
   const awaiting = j => (j.status || "scheduled") === "scheduled" && endOf(j) < todayStr();
@@ -295,10 +307,12 @@ textarea{min-height:70px;resize:vertical}
     for (let i = 0; i < 7; i++) {
       const d = addDays(start, i), ds = ymd(d);
       const list = jobs.filter(j => covers(j, ds) && passes(j)).sort(byOrder);
+      const dayOffs = offs.filter(o => covers(o, ds)).sort((a, b) => a.crew.localeCompare(b.crew));
       const isWeekend = i >= 5;
-      if (isWeekend && !list.length && ds !== t) continue;
+      if (isWeekend && !list.length && !dayOffs.length && ds !== t) continue;
       days.push(el("section", {class: "day" + (ds === t ? " today" : "")},
-        el("h2", {text: fmtDay(d)}),
+        el("h2", {}, el("span", {text: fmtDay(d)}),
+          dayOffs.map(o => el("button", {class: "offchip", title: o.notes || "", onclick: () => openOffSheet(o), text: offLabel(o)}))),
         list.length ? el("div", {class:"jobs"}, list.map(j => jobCard(j, ds)))
                     : el("div", {class:"none", text: "No field work scheduled"})));
     }
@@ -319,6 +333,7 @@ textarea{min-height:70px;resize:vertical}
       cells.push(el("div", {class:"cell" + (d.getMonth() !== first.getMonth() ? " out" : "") + (ds === t ? " today" : "")},
         el("button", {class:"d", text: d.getDate(), "aria-label": `Open week of ${fmtDay(d)}`,
           onclick: () => { anchor = day; setView("week"); }}),
+        offs.filter(o => covers(o, ds)).map(o => el("button", {class: "offchip", title: o.notes || offLabel(o), onclick: () => openOffSheet(o), text: offLabel(o)})),
         list.map(j => el("button", {class:`chip ${(STATUS[j.status]||STATUS.scheduled).cls}`,
           title: [j.crew, j.jobNo, j.title].filter(Boolean).join(" · ") + " — " + (STATUS[j.status]||STATUS.scheduled).label,
           onclick: () => openSheet(j)},
@@ -342,7 +357,7 @@ textarea{min-height:70px;resize:vertical}
     $("vWeek").setAttribute("aria-pressed", String(view === "week"));
     $("vMonth").setAttribute("aria-pressed", String(view === "month"));
     const body = view === "week" ? renderWeek() : renderMonth();
-    $("view").replaceChildren(!jobs.length ? renderEmpty() : body);
+    $("view").replaceChildren(!jobs.length && !offs.length ? renderEmpty() : body);
     $("addBtn").hidden = !canWrite;
   }
   function setView(v) { view = v; try { localStorage.setItem("fs.view", v); } catch {} render(); }
@@ -382,6 +397,9 @@ textarea{min-height:70px;resize:vertical}
     const save = el("button", {class:"btn primary", type:"submit", text: isNew ? "Add job" : "Save", hidden: !canWrite});
     const form = el("form", {class:"sheet", role:"dialog", "aria-modal":"true", "aria-label": isNew ? "Add job" : "Edit job"},
       el("h3", {text: isNew ? "Add field job" : (job.title || "Job")}),
+      isNew ? el("div", {class: "kindset", role: "group", "aria-label": "Entry type"},
+        el("button", {type: "button", "aria-pressed": "true", text: "Field job"}),
+        el("button", {type: "button", "aria-pressed": "false", text: "Time off", onclick: () => { close(); openOffSheet(null, {date: iDate.value, crew: iCrew.value}); }})) : null,
       el("div", {class:"statusset", role:"group", "aria-label":"Processing status"}, statusBtns),
       el("div", {class:"fields"},
         el("label", {for:"f_jobNo"}, "Job number", iJob),
@@ -442,6 +460,70 @@ textarea{min-height:70px;resize:vertical}
     }
   }
 
+  // ---- time-off sheet ----
+  function openOffSheet(entry, seed = {}) {
+    const isNew = !entry;
+    const d = isNew ? {type: "Off", crew: seed.crew || "", date: seed.date || todayStr(), endDate: "", notes: ""} : {...entry};
+    const types = [["Off", "All day"], ["Out", "Part of the day"]].map(([k, sub]) =>
+      el("button", {type: "button", "aria-pressed": String(d.type === k), disabled: !canWrite,
+        onclick: e => { d.type = k; types.forEach(b => b.setAttribute("aria-pressed", String(b === e.currentTarget))); }},
+        k, el("small", {text: sub})));
+    const iWho = el("input", {id: "o_crew", value: d.crew, placeholder: "Initials, e.g. TM", autocapitalize: "characters", disabled: !canWrite});
+    const iFrom = el("input", {id: "o_date", type: "date", value: d.date, disabled: !canWrite});
+    const iTo = el("input", {id: "o_end", type: "date", value: d.endDate, disabled: !canWrite});
+    const iNote = el("textarea", {id: "o_notes", placeholder: "Optional, e.g. back at 1pm", disabled: !canWrite}); iNote.value = d.notes || "";
+    const err = el("p", {class: "err", hidden: true});
+    const confirmBox = el("div", {class: "confirm", hidden: true},
+      el("span", {text: "Remove this time off?"}),
+      el("button", {class: "btn danger", type: "button", text: "Remove", onclick: doDelete}),
+      el("button", {class: "btn", type: "button", text: "Keep", onclick: () => confirmBox.hidden = true}));
+    const save = el("button", {class: "btn primary", type: "submit", text: isNew ? "Add time off" : "Save", hidden: !canWrite});
+    const form = el("form", {class: "sheet", role: "dialog", "aria-modal": "true", "aria-label": isNew ? "Add time off" : "Time off"},
+      el("h3", {text: isNew ? "Add time off" : offLabel(d)}),
+      isNew ? el("div", {class: "kindset", role: "group", "aria-label": "Entry type"},
+        el("button", {type: "button", "aria-pressed": "false", text: "Field job", onclick: () => { close(); openSheet(null); }}),
+        el("button", {type: "button", "aria-pressed": "true", text: "Time off"})) : null,
+      el("div", {class: "typeset", role: "group", "aria-label": "Type"}, types),
+      el("div", {class: "fields"},
+        el("label", {class: "full", for: "o_crew"}, "Who", iWho),
+        el("label", {for: "o_date"}, "From", iFrom),
+        el("label", {for: "o_end"}, "Through (optional)", iTo),
+        el("label", {class: "full", for: "o_notes"}, "Note", iNote)),
+      err, confirmBox,
+      el("div", {class: "actions"},
+        !isNew && canWrite ? el("button", {class: "btn danger", type: "button", text: "Remove", onclick: () => confirmBox.hidden = false}) : el("span"),
+        el("div", {class: "right"}, el("button", {class: "btn", type: "button", text: canWrite ? "Cancel" : "Close", onclick: () => close()}), save)));
+    const scrim = el("div", {class: "scrim", onclick: e => { if (e.target === scrim) close(); }}, form);
+    const onKey = e => { if (e.key === "Escape") close(); };
+    function close() { scrim.remove(); document.removeEventListener("keydown", onKey); }
+    document.addEventListener("keydown", onKey);
+    $("sheetHost").replaceChildren(scrim);
+    iWho.focus();
+
+    form.addEventListener("submit", async e => {
+      e.preventDefault(); err.hidden = true;
+      const crew = iWho.value.trim().toUpperCase();
+      if (!crew || !iFrom.value) { err.textContent = "Enter who is off and the first day."; err.hidden = false; return; }
+      const fields = {Title: d.type, Crew: crew, FieldDate: iFrom.value, EndDate: iTo.value && iTo.value > iFrom.value ? iTo.value : "",
+        Notes: iNote.value.trim(), JobNo: "", Location: "", Status: "Time off"};
+      save.disabled = true;
+      try {
+        if (isNew) await graph(itemsPath(), {method: "POST", body: {fields}});
+        else await graph(`${itemsPath()}/${entry.id}/fields`, {method: "PATCH", body: fields});
+        close(); toast(isNew ? "Time off added" : "Saved"); load();
+      } catch (ex) {
+        save.disabled = false;
+        err.textContent = ex && ex.status === 403 ? "You can view the schedule but not change it. Ask the SharePoint site owner for Edit access."
+          : "Couldn't save: " + ((ex && ex.message) || "check your connection and try again.");
+        err.hidden = false;
+      }
+    });
+    async function doDelete() {
+      try { await graph(`${itemsPath()}/${entry.id}`, {method: "DELETE"}); close(); toast("Time off removed"); load(); }
+      catch { err.textContent = "Couldn't remove it. Try again."; err.hidden = false; }
+    }
+  }
+
   // ---- Microsoft Graph ----
   async function token(extra) {
     const req = {scopes: extra ? SCOPES.concat(extra) : SCOPES, account};
@@ -480,7 +562,10 @@ textarea{min-height:70px;resize:vertical}
     try {
       let next = `${itemsPath()}?$expand=fields($select=Title,JobNo,Crew,FieldDate,EndDate,Location,Notes,Status)&$top=999`, all = [];
       while (next) { const page = await graph(next); all = all.concat(page.value || []); next = page["@odata.nextLink"]; }
-      jobs = all.map(fromItem).filter(j => /^\d{4}-\d{2}-\d{2}$/.test(j.date));
+      const rows = all.filter(it => /^\d{4}-\d{2}-\d{2}$/.test(it.fields?.FieldDate || ""));
+      offs = rows.filter(it => it.fields.Status === "Time off").map(it => ({id: it.id, crew: it.fields.Crew || "", type: it.fields.Title || "Off",
+        date: it.fields.FieldDate, endDate: it.fields.EndDate || "", notes: it.fields.Notes || ""}));
+      jobs = rows.filter(it => it.fields.Status !== "Time off").map(fromItem);
       loaded = true; $("notice").hidden = true;
       $("syncLine").textContent = "Updated " + new Date().toLocaleTimeString(undefined, {hour: "numeric", minute: "2-digit"});
       render();
@@ -512,7 +597,7 @@ textarea{min-height:70px;resize:vertical}
         {name: "EndDate", displayName: "Through", text: {}},
         {name: "Location", text: {}},
         {name: "Notes", text: {allowMultipleLines: true, textType: "plain"}},
-        {name: "Status", choice: {choices: ["Not processed", "Partially processed", "Processed"], displayAs: "dropDownMenu"}, defaultValue: {value: "Not processed"}},
+        {name: "Status", choice: {choices: ["Not processed", "Partially processed", "Processed", "Time off"], displayAs: "dropDownMenu", allowTextEntry: true}, defaultValue: {value: "Not processed"}},
       ]}});
     return made.id;
   }
