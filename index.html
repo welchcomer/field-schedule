@@ -360,7 +360,7 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
 (() => {
   "use strict";
   // ===================== settings =====================
-  const APP = {name: "Field Schedule", version: "1.7.1"};
+  const APP = {name: "Field Schedule", version: "1.8.0"};
   const CREW = ["MH", "RR", "SR", "TM", "TT"];                // crew initials
   const TASKS = ["Mon Search", "Set Mons", "Set Control", "Topo", "Dips", "Scan", "Flight", "Stake Curb", "Stake Fence", "Stake Signs", "Stake Sewer", "Stake Storm", "Stake Striping", "Stake Sawcuts", "Stake Water"];
   const SUPPORT_EMAIL = "ttucker@welchcomer.com";
@@ -861,7 +861,7 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
     const statusBtns = Object.entries(STATUS).map(([k, s]) => el("button", {type: "button", class: s.cls, "aria-pressed": String(draft.status === k),
       onclick: e => { draft.status = k; statusBtns.forEach(b => b.setAttribute("aria-pressed", String(b === e.currentTarget))); }}, s.label));
     const inp = (id, v, ph, extra = {}) => el("input", {id, value: v || "", placeholder: ph, ...extra});
-    const iNo = inp("f_jobNo", draft.jobNo, "e.g. 42021.200", {inputmode: "decimal"});
+    const iNo = inp("f_jobNo", draft.jobNo, "e.g. 42021.200", {inputmode: "decimal", list: "dl_jobNo", autocomplete: "off"});
     // crew: first person, plus an optional second (saved as "RR/SR")
     const [c1 = "", c2 = "", ...cRest] = (draft.crew || "").toUpperCase().split(/[\/,&+ ]+/).filter(Boolean);
     const crewSel = (id, v, first) => el("select", {id, "aria-label": first ? "Crew member" : "Second crew member (optional)"},
@@ -888,7 +888,18 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
     fillTxt.addEventListener("input", () => { fillBox.checked = !!fillTxt.value.trim(); showSum(); });
     showSum();
     const iTent = el("input", {type: "checkbox", id: "f_tent", checked: !!draft.tentative});
-    const iTitle = inp("f_title", draft.title, "Job name or site");   // Location hidden for now; any saved value is kept
+    const iTitle = inp("f_title", draft.title, "Job name or site", {list: "dl_title", autocomplete: "off"});   // Location hidden for now; any saved value is kept
+    // previous jobs, newest first: typing or picking one fills in the other half (number <-> name)
+    const past = (docData.jobs || []).filter(j => j.kind !== "off" && (j.jobNo || j.title)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    const byNo = new Map(), byTitle = new Map();
+    for (const j of past) { if (j.jobNo && !byNo.has(j.jobNo)) byNo.set(j.jobNo, j.title || ""); if (j.title && !byTitle.has(j.title.toLowerCase())) byTitle.set(j.title.toLowerCase(), j); }
+    const dlNo = el("datalist", {id: "dl_jobNo"}, [...byNo].map(([no, t]) => el("option", {value: no, label: t})));
+    const dlTitle = el("datalist", {id: "dl_title"}, [...byTitle.values()].map(j => el("option", {value: j.title, label: j.jobNo || ""})));
+    let autoTitle = "", autoNo = "";
+    iNo.addEventListener("input", () => { const t = byNo.get(iNo.value.trim());
+      if (t && (!iTitle.value.trim() || iTitle.value === autoTitle)) { iTitle.value = autoTitle = t; } });
+    iTitle.addEventListener("input", () => { const j = byTitle.get(iTitle.value.trim().toLowerCase());
+      if (j && j.jobNo && (!iNo.value.trim() || iNo.value === autoNo)) { iNo.value = autoNo = j.jobNo; } });
     const iDate = inp("f_date", draft.date, "", {type: "date"}), iEnd = inp("f_endDate", draft.endDate, "", {type: "date"});
     // the old free-text Notes box only shows on jobs that still have some (older jobs, Outlook imports)
     const iNotes = el("textarea", {id: "f_notes"}); iNotes.value = draft.notes || "";
@@ -903,9 +914,9 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
       el("div", {class: "statusset", role: "group", "aria-label": "Processing status"}, statusBtns),
       el("label", {class: "tentrow", for: "f_tent"}, iTent, el("span", {}, el("b", {class: "tq", text: "?? "}), "Tentative", el("small", {text: "Possible date, not set yet"}))),
       el("div", {class: "fields"},
-        el("label", {class: "f", for: "f_jobNo"}, "Job number", iNo),
+        el("label", {class: "f", for: "f_jobNo"}, "Job number", iNo, dlNo),
         el("div", {class: "f"}, el("label", {for: "f_crew"}, "Crew"), el("div", {class: "crewpair"}, iCrew1, iCrew2)),
-        el("label", {class: "f full", for: "f_title"}, "Job", iTitle),
+        el("label", {class: "f full", for: "f_title"}, "Job", iTitle, dlTitle),
         el("label", {class: "f", for: "f_date"}, "Field date", iDate),
         el("label", {class: "f", for: "f_endDate"}, "Through (optional)", iEnd),
         el("div", {class: "f full"}, el("span", {text: "General tasks"}), multi),
