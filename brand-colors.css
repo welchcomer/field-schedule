@@ -1,0 +1,80 @@
+/* Welch Comer brand colors and Light / Dark themes  (Tool Standards v2.2)
+   Source: Welch Comer Brand Colors.pdf. Master copy: _WC_Standards\brand\. Copy into each tool; don't edit the copy.
+
+   Light is the default. Dark applies when <html data-theme="dark">, or when the tool has no
+   saved choice (no data-theme attribute) and Windows is set to dark.
+   The Light / Dark switch in the header sets data-theme="light" or "dark" and saves it per person. */
+
+:root {
+  /* ---- Brand palette (never changes with the theme) ---- */
+  --wc-dark-blue:   #08385B;
+  --wc-navy-blue:   #084B77;
+  --wc-bright-blue: #0076BC;
+  --wc-light-blue:  #CCE1F3;
+  --wc-dark-grey:   #373A36;
+  --wc-light-grey:  #D9D9D9;
+  --wc-gold:   #CBBE57;
+  --wc-green:  #596B33;
+  --wc-orange: #F1644C;
+
+  /* ---- Theme: light (default) ---- */
+  --wc-bg:          #F5F7FA;   /* page background */
+  --wc-header-bg:   #FFFFFF;   /* shared header */
+  --wc-band:        #08385B;   /* project band (white text on it) */
+  --wc-panel:       #FFFFFF;   /* cards, tables, side panels, dialogs */
+  --wc-line:        #D9D9D9;   /* borders, dividers */
+  --wc-text:        #373A36;
+  --wc-text-muted:  #5E625E;
+  --wc-link:        #084B77;
+  --wc-heading:     #08385B;
+  --wc-selected:    #CCE1F3;   /* selected row, pressed segment */
+  --wc-selected-text: #08385B;
+
+  /* ---- Roles ---- */
+  --wc-primary:      var(--wc-bright-blue);  /* the one main button per view; white text */
+  --wc-primary-dark: var(--wc-navy-blue);    /* hover, active */
+  --wc-status-done:      var(--wc-green);
+  --wc-status-progress:  var(--wc-gold);
+  --wc-status-attention: var(--wc-orange);
+  --wc-status-none:      var(--wc-light-grey);
+
+  --wc-font: 'Roboto', Arial, sans-serif;
+  --wc-font-mono: 'Roboto Mono', Consolas, monospace;
+  color-scheme: light;
+}
+
+/* ---- Theme: dark. Every text pair here passes AA (lowest 7.5:1). ---- */
+:root[data-theme="dark"] {
+  --wc-bg:          #0A1826;
+  --wc-header-bg:   #0E2236;
+  --wc-band:        #0F2A44;
+  --wc-panel:       #102538;
+  --wc-line:        #1E3A52;
+  --wc-text:        #E6EEF5;
+  --wc-text-muted:  #A9BCCB;
+  --wc-link:        #8CC4EC;
+  --wc-heading:     #FFFFFF;
+  --wc-selected:    #1E4466;
+  --wc-selected-text: #FFFFFF;
+  --wc-status-done: #8DB255;      /* lighter green so the dot reads on dark */
+  color-scheme: dark;
+}
+
+/* No saved choice yet: follow Windows. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --wc-bg:          #0A1826;
+    --wc-header-bg:   #0E2236;
+    --wc-band:        #0F2A44;
+    --wc-panel:       #102538;
+    --wc-line:        #1E3A52;
+    --wc-text:        #E6EEF5;
+    --wc-text-muted:  #A9BCCB;
+    --wc-link:        #8CC4EC;
+    --wc-heading:     #FFFFFF;
+    --wc-selected:    #1E4466;
+    --wc-selected-text: #FFFFFF;
+    --wc-status-done: #8DB255;
+    color-scheme: dark;
+  }
+}
