@@ -77,6 +77,19 @@ a{color:var(--wc-link)}
 .btn.primary:hover{background:var(--wc-primary-dark);border-color:var(--fs-accent)}
 .btn:disabled{background:var(--wc-border);border-color:var(--wc-border);color:var(--wc-muted);cursor:default}
 .linkbtn{border:0;background:none;padding:0;color:var(--wc-link);font-weight:500}
+.implist{display:flex;flex-direction:column;border:1px solid var(--wc-border);border-radius:8px;max-height:46vh;overflow-y:auto}
+.improw{display:grid;grid-template-columns:auto 76px minmax(0,1fr);gap:4px 10px;align-items:center;padding:7px 10px;border-top:1px solid var(--wc-border);font-size:14px;line-height:18px;cursor:pointer}
+.improw:first-child{border-top:0}
+.improw input{width:18px;height:18px;margin:0;accent-color:var(--wc-primary)}
+.improw .d{font-variant-numeric:tabular-nums;color:var(--wc-muted);font-size:13px}
+.improw .w{display:flex;gap:6px;align-items:center;min-width:0;overflow-wrap:anywhere}
+.improw .k{flex:none;border-radius:3px;padding:0 5px;font-size:11px;line-height:16px;font-weight:700;background:var(--c, var(--fs-offbg, #8a8d8f));color:var(--ink, #fff)}
+.improw .k.off{background:#7A7D80;color:#fff}
+.improw .dup{grid-column:3;font-size:12px;color:var(--wc-muted)}
+.improw.is-dup{opacity:.6}
+.impbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px}
+.impbar select{width:auto}
+.imphelp{font-size:13px;line-height:18px;color:var(--wc-muted);margin:0}
 
 /* summary counts */
 .summary{flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
@@ -347,9 +360,9 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
 (() => {
   "use strict";
   // ===================== settings =====================
-  const APP = {name: "Field Schedule", version: "1.6.0"};
+  const APP = {name: "Field Schedule", version: "1.7.0"};
   const CREW = ["MH", "RR", "SR", "TM", "TT"];                // crew initials
-  const TASKS = ["Mon Search", "Set Control", "Scan", "Flight", "Stake Curb", "Stake Fence", "Stake Signs", "Stake Sewer", "Stake Storm", "Stake Striping", "Stake Sawcuts", "Stake Water"];
+  const TASKS = ["Mon Search", "Set Control", "Topo", "Scan", "Flight", "Stake Curb", "Stake Fence", "Stake Signs", "Stake Sewer", "Stake Storm", "Stake Striping", "Stake Sawcuts", "Stake Water"];
   const SUPPORT_EMAIL = "ttucker@welchcomer.com";
   const KEYS_FILE = "keys.json";          // made by the setup screen (#setup); holds the GitHub key, locked with the team passcode
   const ITERATIONS = 250000;              // passcode stretching (PBKDF2-SHA256)
@@ -567,6 +580,7 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
     $("info").replaceChildren(
       el("span", {text: `${APP.name} v${APP.version}`}),
       session && myName ? el("span", {text: myName}) : null,
+      session && canEdit() ? el("span", {class: "imp"}, el("button", {class: "linkbtn", id: "importBtn", text: "Import .ics", onclick: () => pickIcs()})) : null,
       session ? el("span", {}, el("button", {class: "linkbtn", text: "Lock", onclick: () => lock()})) : null);
     // header: status and the person's initials
     $("live").hidden = !(session && lastSync); $("live").textContent = "Updated " + (lastSync || "");
@@ -876,7 +890,8 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
     const iTent = el("input", {type: "checkbox", id: "f_tent", checked: !!draft.tentative});
     const iTitle = inp("f_title", draft.title, "Job name or site"), iLoc = inp("f_location", draft.location, "Address, township/range, etc.");
     const iDate = inp("f_date", draft.date, "", {type: "date"}), iEnd = inp("f_endDate", draft.endDate, "", {type: "date"});
-    const iNotes = el("textarea", {id: "f_notes", placeholder: "Anything else, e.g. Topo and mons, meet owner at gate"}); iNotes.value = draft.notes || "";
+    // the old free-text Notes box only shows on jobs that still have some (older jobs, Outlook imports)
+    const iNotes = el("textarea", {id: "f_notes"}); iNotes.value = draft.notes || "";
     const iProc = el("textarea", {id: "f_proc", placeholder: "Why it's still red or yellow, e.g. Waiting on control from RR"}); iProc.value = draft.procNotes || "";
     const err = el("p", {class: "err", hidden: true});
     const what = job ? [job.jobNo, job.title].filter(Boolean).join(" ") : "";
@@ -895,7 +910,7 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
         el("label", {class: "f", for: "f_endDate"}, "Through (optional)", iEnd),
         el("label", {class: "f full", for: "f_location"}, "Location", iLoc),
         el("div", {class: "f full"}, el("span", {text: "General tasks"}), multi),
-        el("label", {class: "f full", for: "f_notes"}, "Notes", iNotes),
+        draft.notes ? el("label", {class: "f full", for: "f_notes"}, "Notes (older entry, clear it to remove)", iNotes) : null,
         el("label", {class: "f full", for: "f_proc"}, "Processing notes", iProc)),
       !isNew && stampText(job) ? el("p", {class: "stamp", text: stampText(job)}) : null,
       err, confirmBox,
@@ -924,6 +939,135 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
       try { await save(remove(job.id), `Delete ${job.jobNo || job.title}`); s.close(); toast("Job deleted"); }
       catch (ex) { err.textContent = saveError(ex); err.hidden = false; }
     }
+  }
+
+  // ---------- import an .ics file (e.g. saved from Outlook) ----------
+  function pickIcs() {
+    const f = el("input", {type: "file", accept: ".ics,text/calendar", multiple: true, style: "display:none"});
+    f.addEventListener("change", async () => {
+      const files = [...f.files]; f.remove(); if (!files.length) return;
+      try { const texts = await Promise.all(files.map(x => x.text())); importPreview(texts.flatMap(icsEvents), files.map(x => x.name).join(", ")); }
+      catch (ex) { toast("Couldn't read that file."); }
+    });
+    document.body.append(f); f.click();
+  }
+  // RFC 5545: unfold lines, split into VEVENTs, unescape text
+  function icsEvents(text) {
+    const lines = text.replace(/\r\n?/g, "\n").replace(/\n[ \t]/g, "").split("\n");
+    const out = []; let ev = null, depth = 0;
+    for (const line of lines) {
+      if (line === "BEGIN:VEVENT") { ev = {}; depth = 0; continue; }
+      if (!ev) continue;
+      if (line.startsWith("BEGIN:")) { depth++; continue; }        // e.g. VALARM inside the event
+      if (line.startsWith("END:") && depth) { depth--; continue; }
+      if (line === "END:VEVENT") { out.push(ev); ev = null; continue; }
+      if (depth) continue;
+      const c = line.indexOf(":"); if (c < 0) continue;
+      const [name, ...params] = line.slice(0, c).split(";");
+      const prm = Object.fromEntries(params.map(x => x.split("=")).map(([k, v]) => [k.toUpperCase(), v]));
+      const key = name.toUpperCase(), val = line.slice(c + 1);
+      if (key === "EXDATE") (ev.EXDATE = ev.EXDATE || []).push(...val.split(","));
+      else if (!(key in ev)) ev[key] = {val, prm};
+    }
+    const un = v => (v || "").replace(/\\n/gi, "\n").replace(/\\([,;\\])/g, "$1").trim();
+    return out.filter(e => e.DTSTART && !e["RECURRENCE-ID"] && (e.STATUS?.val || "").toUpperCase() !== "CANCELLED").map(e => ({
+      uid: e.UID?.val || "", summary: un(e.SUMMARY?.val), description: un(e.DESCRIPTION?.val), location: un(e.LOCATION?.val),
+      categories: un(e.CATEGORIES?.val), start: icsTime(e.DTSTART), end: e.DTEND ? icsTime(e.DTEND) : null,
+      rrule: e.RRULE?.val || "", exdates: (e.EXDATE || []).map(x => icsTime({val: x, prm: {}}).date)}));
+  }
+  function icsTime(p) {
+    const v = p.val.trim(), m = v.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?/);
+    if (!m) return {date: "", time: "", allDay: true};
+    if (!m[4]) return {date: `${m[1]}-${m[2]}-${m[3]}`, time: "", allDay: true};
+    if (m[7]) { const d = new Date(Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5])); return {date: ymd(d), time: `${pad(d.getHours())}:${pad(d.getMinutes())}`, allDay: false}; }
+    return {date: `${m[1]}-${m[2]}-${m[3]}`, time: `${m[4]}:${m[5]}`, allDay: false};
+  }
+  const OFF_WORDS = /\b(off|out|pto|vacation|vac|sick|leave|appt|appointment|dentist|doctor|dr)\b/i;
+  // turn one calendar event into a job or a time-off entry, guessing from the subject line
+  function eventToItem(ev, defaultStatus) {
+    let text = ev.summary.replace(/\s+/g, " ").trim();
+    const item = {};
+    if (/\?\?/.test(text)) { item.tentative = true; text = text.replace(/\?\?/g, " ").trim(); }
+    // crew initials at the start, e.g. "RR/SR", "TT", "RR & SR"
+    const cm = text.match(/^([A-Z]{2,3}(?:\s*[\/,&+]\s*[A-Z]{2,3})*)(?=[\s:\-–]|$)[\s:\-–]*/);
+    let crew = "";
+    if (cm) { const toks = cm[1].split(/\s*[\/,&+]\s*/); if (toks.every(t => CREW.includes(t) || t.length === 2)) { crew = toks.join("/"); text = text.slice(cm[0].length).trim(); } }
+    const noM = text.match(/\b\d{5}[.\-]\d{2,3}\b/);
+    const end = ev.end ? (ev.end.allDay || ev.end.time === "00:00" ? ymd(addDays(parse(ev.end.date), -1)) : ev.end.date) : "";
+    const endDate = end && end > ev.start.date ? end : "";
+    if (!noM && OFF_WORDS.test(text)) {
+      if (!crew) { const w = text.match(new RegExp("\\b(" + CREW.join("|") + ")\\b")); if (w) { crew = w[1]; text = text.replace(w[0], "").trim(); } }
+      const isOut = /\b(out|appt|appointment|dentist|doctor|dr)\b/i.test(text) && !/\b(off|pto|vacation|vac)\b/i.test(text) || (!ev.start.allDay && !/\b(off|pto|vacation|vac)\b/i.test(text));
+      const note = text.replace(/^\s*(off|out|pto)\b[\s:\-–]*/i, "").trim();
+      Object.assign(item, {kind: "off", offType: isOut ? "Out" : "Off", crew, date: ev.start.date, endDate: isOut ? "" : endDate,
+        notes: [note && note.toLowerCase() !== "off" ? note : "", ev.description].filter(Boolean).join("\n").slice(0, 300)});
+      delete item.tentative;
+      if (isOut && !ev.start.allDay) item.time = ev.start.time;
+      const rr = Object.fromEntries(ev.rrule.split(";").filter(Boolean).map(x => x.split("=")));
+      if (rr.FREQ === "WEEKLY" && !rr.COUNT) {
+        item.repeat = {every: +rr.INTERVAL || 1, until: rr.UNTIL ? icsTime({val: rr.UNTIL, prm: {}}).date : ""};
+        if (ev.exdates.length) item.skip = ev.exdates;
+        item.endDate = "";
+      }
+    } else {
+      const cat = ev.categories.toLowerCase();
+      const status = /green/.test(cat) ? "processed" : /yellow|orange/.test(cat) ? "partial" : /red/.test(cat) ? "scheduled" : defaultStatus;
+      const title = (noM ? text.replace(noM[0], " ") : text).replace(/\s+/g, " ").replace(/^[\s\-–:,]+|[\s\-–:,]+$/g, "");
+      const hay = " " + text.toLowerCase() + " ";
+      const tasks = TASKS.filter(t => hay.includes(" " + t.toLowerCase() + " ") || hay.includes(" " + t.toLowerCase() + ","));
+      let desc = ev.description.split(/_{10,}|Microsoft Teams/i)[0].trim().slice(0, 500);
+      Object.assign(item, {kind: "job", status, jobNo: noM ? noM[0].replace("-", ".") : "", crew, title, location: ev.location,
+        date: ev.start.date, endDate, notes: desc, procNotes: ""});
+      if (tasks.length) item.tasks = tasks;
+    }
+    if (ev.uid) item.icsUid = ev.uid;
+    return item;
+  }
+  const sameAs = (a, b) => (a.icsUid && a.icsUid === b.icsUid) || (a.kind === b.kind && a.date === b.date && (a.crew || "") === (b.crew || "")
+    && (a.kind === "off" ? (a.offType || "Off") === (b.offType || "Off") : (a.jobNo || a.title) === (b.jobNo || b.title)));
+  function importPreview(events, fileName) {
+    if (!events.length) { toast("No calendar items found in that file."); return; }
+    let defaultStatus = "scheduled";
+    const existing = docData.jobs || [];
+    const rows = events.filter(ev => ev.start.date).sort((a, b) => a.start.date.localeCompare(b.start.date)).map(ev => ({ev}));
+    const listEl = el("div", {class: "implist"});
+    const count = el("span"), go = el("button", {class: "btn primary", type: "button"});
+    const sel = el("select", {"aria-label": "Status for jobs with no Outlook color"},
+      Object.entries(STATUS).map(([k, st]) => el("option", {value: k, text: st.label, selected: k === defaultStatus})));
+    const label = it => it.kind === "off" ? offLabel(it) + (it.repeat ? " ↻" : "") + (it.notes ? " · " + it.notes.split("\n")[0] : "")
+      : [it.tentative ? "??" : "", it.crew, it.jobNo, it.title || "Untitled"].filter(Boolean).join(" ");
+    function build() {
+      rows.forEach(r => { r.item = eventToItem(r.ev, defaultStatus); r.dup = existing.some(j => sameAs(j, r.item)); if (r.on === undefined) r.on = !r.dup; });
+      listEl.replaceChildren(...rows.map(r => {
+        const it = r.item, st = STATUS[it.status] || STATUS.scheduled;
+        const cb = el("input", {type: "checkbox", checked: r.on, onchange: e => { r.on = e.target.checked; tally(); }});
+        return el("label", {class: "improw" + (r.dup ? " is-dup" : "")}, cb,
+          el("span", {class: "d", text: fmtShort(parse(it.date)) + (it.endDate ? "–" : "")}),
+          el("span", {class: "w"}, it.kind === "off" ? el("span", {class: "k off", text: it.offType}) : el("span", {class: "k " + st.cls, text: "Job"}), label(it)),
+          r.dup ? el("span", {class: "dup", text: "Already on the schedule"}) : null);
+      }));
+      tally();
+    }
+    function tally() { const n = rows.filter(r => r.on).length; count.textContent = `${n} of ${rows.length} selected`; go.textContent = n ? `Import ${n}` : "Import"; go.disabled = !n; }
+    sel.addEventListener("change", () => { defaultStatus = sel.value; build(); });
+    const all = on => { rows.forEach(r => r.on = on && !r.dup); build(); };
+    const err = el("p", {class: "err", hidden: true});
+    go.addEventListener("click", async () => {
+      const picked = rows.filter(r => r.on).map(r => stamp({...r.item, id: newId()}));
+      go.disabled = true; err.hidden = true;
+      try {
+        await save(d => { for (const it of picked) if (!d.jobs.some(j => sameAs(j, it))) d.jobs.push(it); }, `Import ${picked.length} from ${fileName}`.slice(0, 120));
+        s.close(); toast(`Imported ${picked.length}`);
+      } catch (ex) { go.disabled = false; err.textContent = saveError(ex); err.hidden = false; }
+    });
+    const s = sheet("Import calendar items",
+      el("p", {class: "imphelp", text: `From ${fileName}. Each subject line is read like "RR/SR 51063.210 Well 3E" for jobs or "TT Off" / "SR Out dentist" for time off. Outlook red, yellow and green categories set the status. Check the list, then import. Anything can be edited afterwards.`}),
+      el("div", {class: "impbar"}, el("span", {text: "Jobs with no color:"}), sel,
+        el("button", {class: "linkbtn", type: "button", text: "Select all", onclick: () => all(true)}),
+        el("button", {class: "linkbtn", type: "button", text: "Select none", onclick: () => all(false)})),
+      listEl, el("p", {class: "stamp"}, count), err,
+      el("div", {class: "actions"}, el("span"), el("div", {class: "right"}, el("button", {class: "btn", type: "button", text: "Cancel", onclick: () => s.close()}), go)));
+    build();
   }
 
   function openOff(entry, seed = {}, onDay) {
