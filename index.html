@@ -360,9 +360,9 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
 (() => {
   "use strict";
   // ===================== settings =====================
-  const APP = {name: "Field Schedule", version: "1.7.0"};
+  const APP = {name: "Field Schedule", version: "1.7.1"};
   const CREW = ["MH", "RR", "SR", "TM", "TT"];                // crew initials
-  const TASKS = ["Mon Search", "Set Control", "Topo", "Scan", "Flight", "Stake Curb", "Stake Fence", "Stake Signs", "Stake Sewer", "Stake Storm", "Stake Striping", "Stake Sawcuts", "Stake Water"];
+  const TASKS = ["Mon Search", "Set Mons", "Set Control", "Topo", "Dips", "Scan", "Flight", "Stake Curb", "Stake Fence", "Stake Signs", "Stake Sewer", "Stake Storm", "Stake Striping", "Stake Sawcuts", "Stake Water"];
   const SUPPORT_EMAIL = "ttucker@welchcomer.com";
   const KEYS_FILE = "keys.json";          // made by the setup screen (#setup); holds the GitHub key, locked with the team passcode
   const ITERATIONS = 250000;              // passcode stretching (PBKDF2-SHA256)
@@ -614,7 +614,7 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
       j.tentative ? el("span", {class: "tq", text: "?? Tentative"}) : null,
       j.jobNo ? el("span", {class: "no", text: j.jobNo}) : null,
       el("span", {class: "name", text: j.title || "Untitled job"}),
-      el("span", {class: "meta", text: [j.crew, j.location].filter(Boolean).join(" · ")}),
+      j.crew ? el("span", {class: "meta", text: j.crew}) : null,
       j.endDate && j.endDate > j.date ? el("span", {class: "meta", text: `${fmtShort(parse(j.date))} – ${fmtShort(parse(j.endDate))}`}) : null,
       j.tasks?.length ? el("span", {class: "tasks", text: taskText(j)}) : null,
       j.notes ? el("span", {class: "notes", text: j.notes}) : null,
@@ -847,7 +847,7 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
         e.repeat ? row("Repeats", repeatText(e)) : row("Date", fmtDay(parse(e.date)) + (e.endDate && e.endDate > e.date ? " – " + fmtDay(parse(e.endDate)) : "")),
         e.repeat && day ? row("This day", fmtDay(parse(day))) : null,
         isOff ? null : row("Schedule", e.tentative ? "?? Tentative, not set yet" : ""),
-        row("Location", e.location), isOff ? null : row("General tasks", taskText(e)), row(isOff ? "Note" : "Notes", e.notes), isOff ? null : row("Processing notes", e.procNotes)),
+        isOff ? null : row("General tasks", taskText(e)), row(isOff ? "Note" : "Notes", e.notes), isOff ? null : row("Processing notes", e.procNotes)),
       stampText(e) ? el("p", {class: "stamp", text: stampText(e)}) : null,
       el("div", {class: "actions"},
         canEdit() ? el("button", {class: "btn primary", type: "button", text: "Edit", onclick: () => { s.close(); isOff ? openOff(e, {}, day) : openJob(e); }}) : el("span"),
@@ -888,7 +888,7 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
     fillTxt.addEventListener("input", () => { fillBox.checked = !!fillTxt.value.trim(); showSum(); });
     showSum();
     const iTent = el("input", {type: "checkbox", id: "f_tent", checked: !!draft.tentative});
-    const iTitle = inp("f_title", draft.title, "Job name or site"), iLoc = inp("f_location", draft.location, "Address, township/range, etc.");
+    const iTitle = inp("f_title", draft.title, "Job name or site");   // Location hidden for now; any saved value is kept
     const iDate = inp("f_date", draft.date, "", {type: "date"}), iEnd = inp("f_endDate", draft.endDate, "", {type: "date"});
     // the old free-text Notes box only shows on jobs that still have some (older jobs, Outlook imports)
     const iNotes = el("textarea", {id: "f_notes"}); iNotes.value = draft.notes || "";
@@ -908,7 +908,6 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
         el("label", {class: "f full", for: "f_title"}, "Job", iTitle),
         el("label", {class: "f", for: "f_date"}, "Field date", iDate),
         el("label", {class: "f", for: "f_endDate"}, "Through (optional)", iEnd),
-        el("label", {class: "f full", for: "f_location"}, "Location", iLoc),
         el("div", {class: "f full"}, el("span", {text: "General tasks"}), multi),
         draft.notes ? el("label", {class: "f full", for: "f_notes"}, "Notes (older entry, clear it to remove)", iNotes) : null,
         el("label", {class: "f full", for: "f_proc"}, "Processing notes", iProc)),
@@ -923,7 +922,7 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
     form.addEventListener("submit", async e => {
       e.preventDefault(); err.hidden = true;
       const item = stamp({...(job || {}), id: job?.id || newId(), kind: "job", status: draft.status || "scheduled",
-        jobNo: iNo.value.trim(), crew: [...new Set([iCrew1.value, iCrew2.value].filter(Boolean))].join("/"), tasks: pickedTasks(), tentative: iTent.checked || undefined, title: iTitle.value.trim(), location: iLoc.value.trim(), notes: iNotes.value.trim(), procNotes: iProc.value.trim(),
+        jobNo: iNo.value.trim(), crew: [...new Set([iCrew1.value, iCrew2.value].filter(Boolean))].join("/"), tasks: pickedTasks(), tentative: iTent.checked || undefined, title: iTitle.value.trim(), notes: iNotes.value.trim(), procNotes: iProc.value.trim(),
         date: iDate.value, endDate: iEnd.value && iEnd.value > iDate.value ? iEnd.value : ""});
       if (!item.date) { err.textContent = "Pick a field date."; err.hidden = false; return; }
       if (!item.tasks.length) delete item.tasks;
@@ -1016,7 +1015,7 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
       const hay = " " + text.toLowerCase() + " ";
       const tasks = TASKS.filter(t => hay.includes(" " + t.toLowerCase() + " ") || hay.includes(" " + t.toLowerCase() + ","));
       let desc = ev.description.split(/_{10,}|Microsoft Teams/i)[0].trim().slice(0, 500);
-      Object.assign(item, {kind: "job", status, jobNo: noM ? noM[0].replace("-", ".") : "", crew, title, location: ev.location,
+      Object.assign(item, {kind: "job", status, jobNo: noM ? noM[0].replace("-", ".") : "", crew, title,
         date: ev.start.date, endDate, notes: desc, procNotes: ""});
       if (tasks.length) item.tasks = tasks;
     }
