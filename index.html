@@ -92,7 +92,13 @@ a{color:var(--wc-primary)}
 /* month (and desktop week) grid */
 .grid{flex:1;min-height:0;display:grid;gap:4px;grid-template-rows:auto}
 .grid .dow{font-size:11px;line-height:16px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--wc-muted);text-align:center;white-space:nowrap;overflow:hidden}
-.cell{min-height:0;min-width:0;background:var(--wc-white);border:1px solid var(--wc-border);border-radius:6px;padding:3px;display:flex;flex-direction:column;gap:3px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.cell{min-height:0;min-width:0;background:var(--wc-white);border:1px solid var(--wc-border);border-radius:6px;padding:3px;display:flex;flex-direction:column;gap:3px;overflow:hidden}
+.ch{flex:none;display:flex;align-items:center;justify-content:space-between;gap:2px;min-width:0}
+.cell.narrow .ch{flex-direction:column}
+.more{flex:none;border:0;background:var(--wc-bg-tint);color:var(--wc-primary-dark);font-weight:500;font-size:11px;line-height:16px;padding:0 6px;border-radius:99px;white-space:nowrap}
+.more:hover{text-decoration:underline}
+.daylist{display:flex;flex-direction:column;gap:8px}
+
 .cell.out{background:#FAFAFA;color:var(--wc-muted)}
 .cell.out .d{color:#9A9C98}
 .cell.today{background:var(--wc-soft);border-color:var(--wc-primary);box-shadow:inset 0 0 0 1px var(--wc-primary)}
@@ -181,6 +187,7 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
 .confirm span{flex-basis:100%;font-weight:500}
 .stamp{font-size:12px;color:var(--wc-muted);margin:0}
 .err{color:var(--st-red);font-size:13px;margin:0;font-weight:500}
+@media (max-width:719px){.more{font-size:10px;line-height:13px;padding:0 4px}}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom,0px));background:var(--wc-header);color:#fff;padding:8px 16px;border-radius:99px;font-size:14px;z-index:20;max-width:calc(100% - 32px)}
 
 /* phones */
@@ -257,7 +264,7 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
 (() => {
   "use strict";
   // ===================== settings =====================
-  const APP = {name: "Field Schedule", version: "1.0.0"};
+  const APP = {name: "Field Schedule", version: "1.1.0"};
   const CREW = ["MH", "RR", "SR", "TM", "TT"];                // initials offered for time off
   const SUPPORT_EMAIL = "ttucker@welchcomer.com";
   const KEYS_FILE = "keys.json";          // made by the setup screen (#setup); holds the GitHub key, locked with the team passcode
@@ -487,12 +494,30 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     const cells = DOW.map((d, i) => el("div", {class: "dow", text: (i === 0 && !cols.sun) || (i === 6 && !cols.sat) ? d.slice(0, isPhone() ? 2 : 3) : d}));
     for (const ds of days) {
       const d = parse(ds), w = d.getDay(), narrow = (w === 0 && !cols.sun) || (w === 6 && !cols.sat);
-      cells.push(el("div", {class: "cell" + (d.getMonth() !== first.getMonth() ? " out" : "") + (ds === t ? " today" : "") + (narrow ? " narrow" : "")},
-        el("button", {class: "d", text: d.getDate(), "aria-label": "Open week of " + fmtDay(d), onclick: () => { anchor = d; setView("week"); }}),
+      cells.push(el("div", {class: "cell" + (d.getMonth() !== first.getMonth() ? " out" : "") + (ds === t ? " today" : "") + (narrow ? " narrow" : ""), "data-day": ds},
+        el("div", {class: "ch"}, el("button", {class: "d", text: d.getDate(), "aria-label": "Open week of " + fmtDay(d), onclick: () => { anchor = d; setView("week"); }})),
         offsOn(ds).map(o => offChip(o, ds, narrow)),
         jobsOn(ds).map(jobChip)));
     }
     return el("div", {class: "grid", style: `grid-template-columns:${cols.css};grid-template-rows:auto repeat(${weeks}, minmax(0,1fr))`}, cells);
+  }
+  // a day with more than fits shows "+N more", which opens that day's full list
+  function fitCells() {
+    document.querySelectorAll("#view .cell").forEach(cell => {
+      cell.querySelector(".more")?.remove();
+      const items = [...cell.querySelectorAll(".offchip, .chip")];
+      items.forEach(i => i.hidden = false);
+      if (cell.scrollHeight <= cell.clientHeight + 1) return;
+      const more = el("button", {class: "more", type: "button", onclick: () => daySheet(cell.dataset.day)});
+      cell.querySelector(".ch").append(more);
+      let n = 0;
+      for (let k = items.length - 1; k >= 0 && cell.scrollHeight > cell.clientHeight + 1; k--) { items[k].hidden = true; n++; more.textContent = `+${n} more`; }
+    });
+  }
+  function daySheet(ds) {
+    const s = sheet(fmtDay(parse(ds)),
+      el("div", {class: "daylist"}, offsOn(ds).map(o => offChip(o, ds, false)), jobsOn(ds).map(jobCard)),
+      el("div", {class: "actions"}, el("span"), el("button", {class: "btn", type: "button", text: "Close", onclick: () => s.close()})));
   }
   function weekDays() { const s = weekStart(anchor); return [...Array(7)].map((_, i) => ymd(addDays(s, i))); }
   function weekRange(days) {
@@ -531,6 +556,7 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     $("vMonth").setAttribute("aria-pressed", String(view === "month"));
     const body = view === "month" ? renderMonth() : isPhone() ? renderWeekList() : renderWeekColumns();
     $("view").replaceChildren(!jobs.length && !offs.length && !loaded ? renderEmpty() : body);
+    if (view === "month") requestAnimationFrame(fitCells);
     $("addBtns").hidden = !canEdit() || $("app").hidden;
   }
   function setView(v) { view = v; store.set("view", v); render(); }
