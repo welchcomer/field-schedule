@@ -4,183 +4,235 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Field Schedule</title>
-<meta name="theme-color" content="#1D5C88">
+<meta name="theme-color" content="#08385B">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Field Schedule">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" type="image/png" href="icon-512.png">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="icon-32.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap">
 <style>
-/* Layout: one column, summary first, then a week agenda (or month grid); status lives in a left stripe + pill on every job */
+/* Welch Comer brand tokens (Tool Standards v2.1, brand-colors.css roles) */
 :root{
-  --bg:#F2F5F7; --surface:#FFFFFF; --sunk:#E8EDF1; --ink:#15202B; --muted:#5A6876; --line:#D6DDE3;
-  --accent:#1D5C88; --accent-ink:#FFFFFF;
-  --red:#C0362C; --amber:#A87900; --amber-mark:#E2AE1C; --green:#2C7A45;
-  --font-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
-  --font-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
-  --radius:10px; color-scheme:light;
+  --wc-primary:#0076BC;       /* Bright Blue: primary buttons, links on white */
+  --wc-primary-dark:#084B77;  /* Navy Blue: hover/active, secondary buttons */
+  --wc-text:#373A36;          /* Dark Grey: body text, icons */
+  --wc-header:#08385B;        /* Dark Blue: title bar, headings */
+  --wc-bg-tint:#CCE1F3;       /* Light Blue: panels, selected */
+  --wc-border:#D9D9D9;        /* Light Grey: borders, dividers */
+  --wc-muted:#5F625E;
+  --wc-white:#FFFFFF;
+  --wc-soft:#F2F7FC;          /* faint Light Blue for quiet panels */
+  /* Field processing status — kept red / yellow / green */
+  --st-red:#C0362C; --st-yellow:#E2AE1C; --st-green:#2C7A45;
+  --font:Roboto,Arial,system-ui,sans-serif;
+  --radius:8px;
+  color-scheme:light;
 }
-@media (prefers-color-scheme: dark){:root{
-  --bg:#0E141A; --surface:#17202A; --sunk:#121A22; --ink:#E5EBF0; --muted:#93A0AD; --line:#283440;
-  --accent:#6CB0DE; --accent-ink:#0E141A;
-  --red:#EE6D61; --amber:#E7B84A; --amber-mark:#E7B84A; --green:#62C083; color-scheme:dark}}
-
 *{box-sizing:border-box}
-html{padding-top:env(safe-area-inset-top,0px)}
 [hidden]{display:none!important}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.4}
-.wrap{max-width:860px;margin:0 auto;padding-inline:16px;padding-block:14px 110px;display:flex;flex-direction:column;gap:16px}
+html,body{height:100%}
+body{margin:0;height:100dvh;display:flex;flex-direction:column;overflow:hidden;background:var(--wc-white);color:var(--wc-text);font:400 14px/20px var(--font)}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
-a{color:var(--accent)}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:var(--wc-primary)}
+:focus-visible{outline:2px solid var(--wc-primary);outline-offset:2px}
 
-/* header */
-.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.brand small{display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
-h1{font-family:var(--font-display);font-weight:700;font-size:32px;line-height:1;margin:2px 0 0;letter-spacing:.01em}
-.who{font-size:13px;color:var(--muted);display:flex;gap:10px;align-items:center;margin-top:6px;flex-wrap:wrap}
-.who .mode{border:1px solid var(--line);border-radius:99px;padding:0 8px;font-weight:600;font-size:12px}
-.linkbtn{border:0;background:none;padding:0;color:var(--accent);font-weight:600;font-size:13px}
-.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:9px 14px;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px}
-.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
-.btn:disabled{opacity:.5;cursor:default}
-.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
-.legend span{display:inline-flex;align-items:center;gap:6px}
-.legend i{width:10px;height:10px;border-radius:50%;background:var(--c);display:inline-block}
+/* header bar: Dark Blue, white W mark, tool name, Support at the right end */
+.bar{flex:none;background:var(--wc-header);color:#fff;display:flex;align-items:center;gap:12px;padding:calc(8px + env(safe-area-inset-top,0px)) 16px 8px}
+.bar img{height:24px;width:auto;display:block}
+.bar h1{margin:0;font-size:18px;line-height:24px;font-weight:500;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .support{color:#fff;text-decoration:none;border:1px solid rgb(255 255 255 / .7);border-radius:6px;padding:5px 12px;font-weight:500;font-size:13px;white-space:nowrap}
+.bar .support:hover{background:var(--wc-primary-dark)}
 
-/* summary */
-.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;display:flex;flex-direction:column;gap:2px;border-top:4px solid var(--c)}
-.stat b{font-family:var(--font-display);font-size:28px;line-height:1;font-variant-numeric:tabular-nums}
-.stat span{font-size:12.5px;color:var(--muted);line-height:1.25}
-@media (max-width:560px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* main frame fills the window; nothing scrolls at page level */
+.frame{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:12px 16px 8px;width:100%;max-width:1400px;margin:0 auto}
+#gate{overflow:auto}
+#app{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}
+
+/* buttons */
+.btn{border:1px solid var(--wc-primary-dark);background:var(--wc-white);color:var(--wc-primary-dark);border-radius:6px;padding:8px 14px;font-weight:500;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.btn:hover{background:var(--wc-soft)}
+.btn.primary{background:var(--wc-primary);border-color:var(--wc-primary);color:#fff}
+.btn.primary:hover{background:var(--wc-primary-dark);border-color:var(--wc-primary-dark)}
+.btn:disabled{background:var(--wc-border);border-color:var(--wc-border);color:var(--wc-muted);cursor:default}
+.linkbtn{border:0;background:none;padding:0;color:var(--wc-primary);font-weight:500}
+
+/* summary counts */
+.summary{flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.stat{background:var(--wc-white);border:1px solid var(--wc-border);border-top:4px solid var(--c);border-radius:var(--radius);padding:6px 12px;display:flex;align-items:baseline;gap:10px;min-width:0}
+.stat b{font-size:26px;line-height:32px;font-weight:400;color:var(--wc-header);font-variant-numeric:tabular-nums}
+.stat span{font-size:13px;line-height:16px;color:var(--wc-text);min-width:0}
+.stat .short{display:none}
+.c-red{--c:var(--st-red)} .c-yellow{--c:var(--st-yellow)} .c-green{--c:var(--st-green)} .c-blue{--c:var(--wc-primary)}
 
 /* nav */
-.nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.nav .range{font-family:var(--font-display);font-weight:600;font-size:21px;flex:1;min-width:0}
-.icon{width:38px;height:38px;padding:0;font-size:18px}
-@media (max-width:560px){.nav .range{flex-basis:100%;order:-1;font-size:20px}.nav .seg{margin-left:auto}}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
-.seg button{border:0;background:none;padding:8px 12px;font-weight:600;color:var(--muted)}
-.seg button[aria-pressed="true"]{background:var(--sunk);color:var(--ink)}
+.nav{flex:none;display:flex;align-items:center;gap:8px}
+.nav .range{font-size:20px;line-height:28px;font-weight:500;color:var(--wc-header);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.icon{width:36px;height:36px;padding:0;font-size:18px}
+.seg{display:inline-flex;border:1px solid var(--wc-primary-dark);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:var(--wc-white);padding:7px 14px;font-weight:500;color:var(--wc-primary-dark)}
+.seg button[aria-pressed="true"]{background:var(--wc-primary-dark);color:#fff}
+.legend{display:flex;gap:12px;font-size:12px;color:var(--wc-text);white-space:nowrap}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.notice{margin:0;font-size:13px;color:var(--wc-muted)}
+.notice.warn{flex:none;color:var(--st-red);font-weight:500}
 
-/* week agenda */
-.days{display:flex;flex-direction:column;gap:14px}
-.day h2{margin:0 0 6px;font-family:var(--font-display);font-weight:600;font-size:16px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.day.today h2{color:var(--accent)}
-.day.today h2 .tag{font-size:11px;letter-spacing:.1em;border:1px solid currentColor;border-radius:99px;padding:0 7px}
-.day .none{color:var(--muted);font-size:13.5px;padding:2px 0 0 2px}
-.jobs{display:flex;flex-direction:column;gap:8px}
-.job{display:grid;grid-template-columns:6px minmax(0,1fr) auto;gap:0 12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:0 12px 0 0;text-align:left;width:100%;overflow:hidden;min-height:64px}
-.job .stripe{align-self:stretch;background:var(--c)}
-.job .main{padding:10px 0;min-width:0;display:flex;flex-direction:column;gap:2px}
-.job .no{font-family:var(--font-mono);font-size:12px;color:var(--muted)}
-.job .name{font-weight:600;font-size:16px;overflow-wrap:anywhere}
-.job .meta{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
-.job .flag{font-size:12.5px;font-weight:600;color:var(--red)}
-.job .notes{font-size:13px;color:var(--muted);font-style:italic;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
-.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 9px;border-radius:99px;white-space:nowrap;color:var(--ct);background:color-mix(in srgb,var(--c) 15%,transparent)}
-.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c)}
-.s-scheduled{--c:var(--red);--ct:var(--red)}
-.s-partial{--c:var(--amber-mark);--ct:var(--amber)}
-.s-processed{--c:var(--green);--ct:var(--green)}
-.s-all{--c:var(--accent)}
-@media (max-width:420px){.job .pill .lbl{display:none}.job .pill{padding:6px}}
-.offchip{border:1px dashed var(--line);background:var(--sunk);color:var(--muted);border-radius:99px;font-family:var(--font-body);font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;padding:1px 9px}
-.offchip:hover{color:var(--ink)}
+/* calendar area fills the rest */
+#view{flex:1;min-height:0;display:flex;flex-direction:column}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
+.s-scheduled{--c:var(--st-red)} .s-partial{--c:var(--st-yellow)} .s-processed{--c:var(--st-green)}
 
-/* month grid */
-.month-wrap{overflow-x:auto}
-.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;min-width:340px}
-.month .dow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:center;padding-bottom:2px}
-.cell{background:var(--surface);border:1px solid var(--line);border-radius:6px;min-height:76px;padding:4px;display:flex;flex-direction:column;gap:3px;min-width:0}
-.cell.out{background:transparent;border-style:dashed}
-.cell.today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
-.cell .d{border:0;background:none;padding:0 2px;text-align:left;font-variant-numeric:tabular-nums;font-weight:600;font-size:13px;color:var(--muted)}
-.chip{border:0;border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 14%,var(--surface));border-radius:3px;font-size:11.5px;line-height:1.25;padding:3px 4px;text-align:left;width:100%;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
-.chip b{font-weight:700}
-.cell .offchip{font-size:10.5px;padding:1px 5px;text-align:left;border-radius:4px;width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-@media (max-width:560px){.month{gap:2px}.cell{padding:2px;min-height:64px}.chip{font-size:10.5px;padding:2px 3px;border-left-width:3px;-webkit-line-clamp:4}}
+/* month (and desktop week) grid */
+.grid{flex:1;min-height:0;display:grid;gap:4px;grid-template-rows:auto}
+.grid .dow{font-size:11px;line-height:16px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--wc-muted);text-align:center;white-space:nowrap;overflow:hidden}
+.cell{min-height:0;min-width:0;background:var(--wc-white);border:1px solid var(--wc-border);border-radius:6px;padding:3px;display:flex;flex-direction:column;gap:3px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.cell.out{background:#FAFAFA;color:var(--wc-muted)}
+.cell.out .d{color:#9A9C98}
+.cell.today{background:var(--wc-soft);border-color:var(--wc-primary);box-shadow:inset 0 0 0 1px var(--wc-primary)}
+.cell.narrow{padding:3px 1px;align-items:center}
+.cell .d{flex:none;border:0;background:none;padding:0 3px;text-align:left;font-variant-numeric:tabular-nums;font-weight:500;font-size:13px;line-height:18px;color:var(--wc-header);align-self:flex-start}
+.cell.narrow .d{align-self:center;padding:0}
+.chip{flex:none;border:0;border-left:4px solid var(--c);background:var(--wc-soft);border-radius:3px;font-size:12px;line-height:15px;padding:3px 5px;text-align:left;width:100%;overflow-wrap:anywhere;color:var(--wc-text)}
+.chip b{font-weight:500;color:var(--wc-header)}
+.chip:hover{background:var(--wc-bg-tint)}
+.offchip{flex:none;border:1px dashed #B9BCB8;background:var(--wc-white);color:var(--wc-text);border-radius:4px;font-size:11.5px;line-height:15px;font-weight:500;padding:1px 6px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.offchip:hover{border-color:var(--wc-primary)}
+/* desktop week columns */
+.wkcol{min-height:0;min-width:0;border:1px solid var(--wc-border);border-radius:6px;display:flex;flex-direction:column;overflow:hidden;background:var(--wc-white)}
+.wkcol.today{border-color:var(--wc-primary);box-shadow:inset 0 0 0 1px var(--wc-primary)}
+.wkcol.narrow .wkhead{padding:6px 0;text-align:center}
+.wkhead{flex:none;padding:6px 8px;border-bottom:1px solid var(--wc-border);background:var(--wc-soft);font-size:12px;line-height:16px;font-weight:500;color:var(--wc-header);white-space:nowrap;overflow:hidden}
+.wkhead .num{font-size:18px;line-height:22px;display:block}
+.wkcol.today .wkhead{background:var(--wc-bg-tint)}
+.wkbody{flex:1;min-height:0;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:6px;scrollbar-width:thin}
+.wkcol.narrow .wkbody{padding:6px 2px}
+.card{flex:none;display:flex;flex-direction:column;gap:1px;text-align:left;width:100%;background:var(--wc-white);border:1px solid var(--wc-border);border-left:5px solid var(--c);border-radius:6px;padding:6px 8px;color:var(--wc-text)}
+.card:hover{background:var(--wc-soft)}
+.card .no{font-size:12px;line-height:16px;color:var(--wc-muted);font-variant-numeric:tabular-nums}
+.card .name{font-weight:500;font-size:14px;line-height:18px;color:var(--wc-header);overflow-wrap:anywhere}
+.card .meta{font-size:12px;line-height:16px;color:var(--wc-text);overflow-wrap:anywhere}
+.card .notes{font-size:12px;line-height:16px;color:var(--wc-muted);font-style:italic;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.card .status{display:flex;align-items:center;gap:5px;font-size:12px;line-height:16px;color:var(--wc-text)}
+.card .flag{font-size:12px;line-height:16px;font-weight:500;color:var(--st-red)}
+.none{font-size:12px;color:#8C8F8B;padding:2px}
 
-/* panels: lock screen, setup, empty */
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px 18px;display:flex;flex-direction:column;gap:12px}
-.panel h3{margin:0;font-family:var(--font-display);font-size:24px}
-.panel p{margin:0;color:var(--muted);max-width:62ch}
+/* phone week list (scrolls inside the calendar area only) */
+.wklist{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;overscroll-behavior:contain}
+.wkday{display:flex;flex-direction:column;gap:5px}
+.wkday h2{margin:0;font-size:12px;line-height:18px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--wc-muted);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.wkday.today h2{color:var(--wc-primary)}
+.wkday .tag{border:1px solid currentColor;border-radius:99px;padding:0 6px;font-size:10px;line-height:15px}
+.wkday .row{display:flex;gap:8px;align-items:baseline}
+
+/* bottom bar: who / version on the left, add buttons on the right */
+.foot{flex:none;display:flex;align-items:center;gap:12px;border-top:1px solid var(--wc-border);padding:8px 16px calc(8px + env(safe-area-inset-bottom,0px));background:var(--wc-white)}
+.foot .info{flex:1;min-width:0;font-size:12px;line-height:16px;color:var(--wc-muted)}
+.foot .info span+span::before{content:" · "}
+.foot .adds{display:flex;gap:8px}
+.foot .adds .btn{padding:9px 16px;font-size:15px}
+
+/* panels (passcode, name, setup, empty) */
+.panel{border:1px solid var(--wc-border);border-top:4px solid var(--wc-header);border-radius:var(--radius);padding:20px 18px;display:flex;flex-direction:column;gap:12px;max-width:640px;width:100%;margin:0 auto;background:var(--wc-white)}
+.panel h3{margin:0;font-size:20px;line-height:28px;font-weight:500;color:var(--wc-header)}
+.panel p{margin:0;color:var(--wc-text)}
 .panel .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .panel .row input{flex:1;min-width:180px}
-.panel ol{margin:0;padding-left:20px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
-.notice{font-size:13.5px;color:var(--muted);margin:0}
-.notice.warn{color:var(--red)}
-.syncline{font-size:12.5px;color:var(--muted);text-align:right;margin:0}
-.ok{color:var(--green);font-size:13.5px;margin:0}
+.ok{color:var(--st-green);font-size:13px;margin:0;font-weight:500}
 
-/* fab */
-.fabs{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;z-index:5}
-.fab{border-radius:99px;padding:13px 18px;box-shadow:0 6px 18px rgb(0 0 0 / .22);font-size:16px}
-
-/* sheet */
-.scrim{position:fixed;inset:0;background:rgb(0 0 0 / .45);z-index:10;display:flex;align-items:flex-end;justify-content:center}
-.sheet{background:var(--surface);width:100%;max-width:560px;max-height:92%;overflow-y:auto;border-radius:16px 16px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
-@media (min-width:640px){.scrim{align-items:center}.sheet{border-radius:16px}}
-.sheet h3{margin:0;font-family:var(--font-display);font-size:24px;overflow-wrap:anywhere}
+/* sheets */
+.scrim{position:fixed;inset:0;background:rgb(8 56 91 / .45);z-index:10;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--wc-white);width:100%;max-width:520px;max-height:92%;overflow-y:auto;border-radius:12px 12px 0 0;display:flex;flex-direction:column}
+@media (min-width:640px){.scrim{align-items:center}.sheet{border-radius:12px}}
+.sheet .sh{display:flex;align-items:center;gap:10px;background:var(--wc-header);color:#fff;padding:12px 16px;position:sticky;top:0;z-index:1}
+.sheet .sh h3{margin:0;flex:1;min-width:0;font-size:18px;line-height:24px;font-weight:500;overflow-wrap:anywhere}
+.sheet .x{border:0;background:none;color:#fff;font-size:22px;line-height:22px;width:32px;height:32px;border-radius:6px}
+.sheet .x:hover{background:var(--wc-primary-dark)}
+.sheet .sb{padding:16px;display:flex;flex-direction:column;gap:14px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
 .statusset{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.statusset button{border:2px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 6px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13.5px;line-height:1.2}
-.statusset button::before{content:"";width:16px;height:16px;border-radius:50%;background:var(--c)}
-.statusset button[aria-pressed="true"]{border-color:var(--c);background:color-mix(in srgb,var(--c) 14%,var(--surface))}
-.kindset{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.kindset button{border:0;background:var(--surface);padding:9px;font-weight:600;color:var(--muted)}
-.kindset button[aria-pressed="true"]{background:var(--sunk);color:var(--ink)}
+.statusset button{border:2px solid var(--wc-border);background:var(--wc-white);border-radius:8px;padding:9px 6px;font-weight:500;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;line-height:16px}
+.statusset button::before{content:"";width:14px;height:14px;border-radius:50%;background:var(--c)}
+.statusset button[aria-pressed="true"]{border-color:var(--wc-primary-dark);background:var(--wc-bg-tint)}
 .typeset{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.typeset button{border:2px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 6px;font-weight:600;font-size:14px;line-height:1.2}
-.typeset button small{display:block;font-weight:400;color:var(--muted);font-size:12px}
-.typeset button[aria-pressed="true"]{border-color:var(--accent);background:var(--sunk)}
+.typeset button{border:2px solid var(--wc-border);background:var(--wc-white);border-radius:8px;padding:9px 6px;font-weight:500;font-size:14px;line-height:18px}
+.typeset button small{display:block;font-weight:400;color:var(--wc-muted);font-size:12px}
+.typeset button[aria-pressed="true"]{border-color:var(--wc-primary-dark);background:var(--wc-bg-tint)}
 .fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .fields .full{grid-column:1/-1}
-label.f{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted);letter-spacing:.02em}
-input,textarea,select{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:9px 10px;font-size:16px;font-weight:400;width:100%;min-width:0}
-textarea{min-height:70px;resize:vertical}
-dl.facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;margin:0;font-size:14.5px}
-dl.facts dt{color:var(--muted);font-weight:600;font-size:12.5px;padding-top:2px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;line-height:16px;font-weight:500;color:var(--wc-text);letter-spacing:.04em;text-transform:uppercase}
+input,textarea,select{border:1px solid #B9BCB8;background:var(--wc-white);border-radius:6px;padding:8px 10px;font-size:16px;line-height:22px;width:100%;min-width:0;text-transform:none;letter-spacing:0}
+input:focus,textarea:focus,select:focus{border-color:var(--wc-primary);outline:none;box-shadow:0 0 0 2px var(--wc-bg-tint)}
+input.caps{text-transform:uppercase}
+textarea{min-height:64px;resize:vertical}
+dl.facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;margin:0;font-size:14px}
+dl.facts dt{color:var(--wc-muted);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding-top:1px}
 dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
-.sheet .actions{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
-.sheet .actions .right{display:flex;gap:8px}
-.danger{color:var(--red)}
-.confirm{background:color-mix(in srgb,var(--red) 10%,var(--surface));border:1px solid var(--red);border-radius:8px;padding:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px}
-.stamp{font-size:12.5px;color:var(--muted);margin:0}
-.err{color:var(--red);font-size:13.5px;margin:0}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:99px;font-size:14px;z-index:20;max-width:calc(100% - 32px)}
-@media (prefers-reduced-motion:no-preference){.sheet{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;padding:3px 10px 3px 8px;border-radius:99px;border:1px solid var(--wc-border);align-self:flex-start}
+.pill::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--c)}
+.actions{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.actions .right{display:flex;gap:8px}
+.confirm{background:#FBEDEB;border:1px solid var(--st-red);border-radius:6px;padding:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.confirm span{flex-basis:100%;font-weight:500}
+.stamp{font-size:12px;color:var(--wc-muted);margin:0}
+.err{color:var(--st-red);font-size:13px;margin:0;font-weight:500}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom,0px));background:var(--wc-header);color:#fff;padding:8px 16px;border-radius:99px;font-size:14px;z-index:20;max-width:calc(100% - 32px)}
+
+/* phones */
+@media (max-width:719px){
+  .frame{padding:8px 8px 6px;gap:8px}
+  .bar{padding-left:12px;padding-right:12px}
+  .legend{display:none}
+  .summary{gap:4px}
+  .stat{flex-direction:column;align-items:flex-start;gap:0;padding:4px 6px;border-top-width:3px}
+  .stat b{font-size:20px;line-height:24px}
+  .stat span{font-size:11px;line-height:13px}
+  .stat .long{display:none} .stat .short{display:inline}
+  .nav{gap:4px}
+  .nav .range{font-size:17px;line-height:24px;padding-left:4px}
+  .icon{width:32px;height:32px}
+  .nav .btn{padding:6px 10px}
+  .seg button{padding:6px 10px}
+  .grid{gap:2px}
+  .grid .dow{font-size:10px;letter-spacing:.02em}
+  .cell{padding:2px;gap:2px;border-radius:4px}
+  .cell .d{font-size:11px;line-height:14px;padding:0 2px}
+  .chip{font-size:10px;line-height:12px;padding:2px 3px;border-left-width:3px}
+  .offchip{font-size:9.5px;line-height:12px;padding:0 3px}
+  .foot{padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));gap:8px}
+  .foot .adds .btn{padding:8px 12px;font-size:14px}
+  .foot .info .upd{display:none}
+}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .16s ease-out}@keyframes up{from{transform:translateY(16px);opacity:.7}}}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <div class="brand"><small>Welch Comer · Survey</small><h1>Field Schedule</h1>
-      <div class="who" id="who" hidden><span class="mode" id="modeTag"></span><span id="whoName"></span><button class="linkbtn" id="lockBtn">Lock</button></div>
-    </div>
-    <div class="legend" aria-label="Status key">
-      <span class="s-scheduled"><i></i>Not processed</span>
-      <span class="s-partial"><i></i>Partially processed</span>
-      <span class="s-processed"><i></i>Processed</span>
-    </div>
-  </header>
+<header class="bar">
+  <img src="wmark-white.svg" alt="Welch Comer" width="68" height="24">
+  <h1>Field Schedule</h1>
+  <a class="support" id="supportBtn" href="#">Support</a>
+</header>
 
+<div class="frame">
   <section id="gate" class="panel" hidden></section>
 
-  <div id="app" hidden style="display:flex;flex-direction:column;gap:16px">
+  <div id="app" hidden>
     <section class="summary" id="summary" aria-label="Processing summary"></section>
     <div class="nav">
       <button class="btn icon" id="prev" aria-label="Previous">‹</button>
       <button class="btn" id="todayBtn">Today</button>
       <button class="btn icon" id="next" aria-label="Next">›</button>
       <div class="range" id="range"></div>
+      <div class="legend" aria-label="Status key">
+        <span class="s-scheduled"><i></i>Not processed</span>
+        <span class="s-partial"><i></i>Partially processed</span>
+        <span class="s-processed"><i></i>Processed</span>
+      </div>
       <div class="seg" role="group" aria-label="View">
         <button id="vWeek" aria-pressed="true">Week</button>
         <button id="vMonth" aria-pressed="false">Month</button>
@@ -188,14 +240,16 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     </div>
     <p class="notice warn" id="notice" hidden></p>
     <main id="view" aria-live="polite"></main>
-    <p class="syncline" id="syncLine"></p>
   </div>
 </div>
 
-<div class="fabs" id="addBtns" hidden>
-  <button class="btn fab" id="addOff">+ Time off</button>
-  <button class="btn primary fab" id="addBtn">+ Job</button>
-</div>
+<footer class="foot">
+  <div class="info" id="info"></div>
+  <div class="adds" id="addBtns" hidden>
+    <button class="btn" id="addOff">+ Time off</button>
+    <button class="btn primary" id="addBtn">+ Job</button>
+  </div>
+</footer>
 <div id="sheetHost"></div>
 <div class="toast" id="toast" hidden></div>
 
@@ -203,6 +257,9 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
 (() => {
   "use strict";
   // ===================== settings =====================
+  const APP = {name: "Field Schedule", version: "1.0.0"};
+  const CREW = ["MH", "RR", "SR", "TM", "TT"];                // initials offered for time off
+  const SUPPORT_EMAIL = "ttucker@welchcomer.com";
   const KEYS_FILE = "keys.json";          // made by the setup screen (#setup); holds the GitHub key, locked with the team passcode
   const ITERATIONS = 250000;              // passcode stretching (PBKDF2-SHA256)
   const DEFAULT_REPO = {owner: "welchcomer", name: "field-schedule-data", path: "schedule.json", branch: "main"};
@@ -221,6 +278,7 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     for (const [k, v] of Object.entries(props)) {
       if (k === "class") n.className = v;
       else if (k === "text") n.textContent = v;
+      else if (k === "style") n.style.cssText = v;
       else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
       else if (v !== undefined && v !== null && v !== false) n.setAttribute(k, v === true ? "" : v);
     }
@@ -232,6 +290,11 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     set(k, v) { try { localStorage.setItem("fs." + k, JSON.stringify(v)); } catch {} },
     del(k) { try { localStorage.removeItem("fs." + k); } catch {} },
   };
+  const isPhone = () => matchMedia("(max-width: 719px)").matches;
+
+  // ---------- support button (mailto, per Tool Standards) ----------
+  $("supportBtn").href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`[${APP.name} v${APP.version}] Bug / Feature request`)}&body=${encodeURIComponent(
+    `What were you doing?\n\n\nWhat happened?\n\n\nWhat did you expect?\n\n\n— Tool: ${APP.name} ${APP.version}`)}`;
 
   // ---------- dates ----------
   const pad = n => String(n).padStart(2, "0");
@@ -268,7 +331,7 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   let session = store.get("session");   // {mode: "edit"|"view", token, repo}
   let myName = store.get("name") || "";
   let docData = {v: 1, jobs: []}, sha = null, etag = null;
-  let jobs = [], offs = [], loaded = false;
+  let jobs = [], offs = [], loaded = false, lastSync = "";
   let view = store.get("view") === "month" ? "month" : "week", anchor = new Date();
   const canEdit = () => session && session.mode === "edit";
 
@@ -293,6 +356,8 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   };
   const offLabel = o => `${o.crew || "Someone"} ${(o.offType || "Off").toLowerCase()}`;
   const byOrder = (a, b) => (a.date + (a.crew || "") + (a.jobNo || "") + (a.title || "")).localeCompare(b.date + (b.crew || "") + (b.jobNo || "") + (b.title || ""));
+  const jobsOn = ds => jobs.filter(j => covers(j, ds)).sort(byOrder);
+  const offsOn = ds => offs.filter(o => occurs(o, ds)).sort(byOrder);
 
   // ---------- GitHub storage ----------
   const contentsPath = () => `/repos/${encodeURIComponent(session.repo.owner)}/${encodeURIComponent(session.repo.name)}/contents/${session.repo.path.split("/").map(encodeURIComponent).join("/")}`;
@@ -329,7 +394,8 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     try {
       const changed = await fetchDoc(fresh);
       loaded = true; $("notice").hidden = true;
-      $("syncLine").textContent = "Updated " + new Date().toLocaleTimeString(undefined, {hour: "numeric", minute: "2-digit"});
+      lastSync = new Date().toLocaleTimeString(undefined, {hour: "numeric", minute: "2-digit"});
+      renderInfo();
       if (changed) render();
     } catch (e) {
       if (e.status === 401) { lock("The saved key no longer works. Enter the passcode again (it may have been changed)."); return; }
@@ -360,6 +426,15 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     ? "The saved key can't make changes. Ask Tom to check the schedule setup."
     : "Couldn't save: " + ((ex && ex.message) || "check your connection and try again.");
 
+  // ---------- footer info ----------
+  function renderInfo() {
+    $("info").replaceChildren(
+      el("span", {text: `${APP.name} v${APP.version}`}),
+      session && myName ? el("span", {text: myName}) : null,
+      session ? el("span", {}, el("button", {class: "linkbtn", text: "Lock", onclick: () => lock()})) : null,
+      session && lastSync ? el("span", {class: "upd", text: "Updated " + lastSync}) : null);
+  }
+
   // ---------- summary ----------
   function renderSummary() {
     const t = todayStr(), cutoff = ymd(addDays(new Date(), -30));
@@ -369,76 +444,93 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
       upcoming: jobs.filter(j => (j.status || "scheduled") === "scheduled" && endOf(j) >= t).length,
       processed: jobs.filter(j => j.status === "processed" && endOf(j) >= cutoff).length,
     };
-    const tiles = [["awaiting","s-scheduled","Field done, not processed"],["partial","s-partial","Partially processed"],
-                   ["upcoming","s-all","Scheduled ahead"],["processed","s-processed","Processed, last 30 days"]];
-    $("summary").replaceChildren(...tiles.map(([k, cls, label]) =>
-      el("div", {class: `stat ${cls}`}, el("b", {text: loaded ? n[k] : "–"}), el("span", {text: label}))));
+    const tiles = [["awaiting", "c-red", "Field done, not processed", "Waiting"], ["partial", "c-yellow", "Partially processed", "Partial"],
+                   ["upcoming", "c-blue", "Scheduled ahead", "Ahead"], ["processed", "c-green", "Processed, last 30 days", "Done 30d"]];
+    $("summary").replaceChildren(...tiles.map(([k, cls, long, short]) =>
+      el("div", {class: `stat ${cls}`, title: long}, el("b", {text: loaded ? n[k] : "–"}),
+        el("span", {}, el("span", {class: "long", text: long}), el("span", {class: "short", text: short})))));
   }
 
-  // ---------- cards ----------
+  // ---------- items ----------
   const hoverText = e => e.notes || undefined;   // tooltip is just the typed notes
   function jobCard(j) {
     const st = STATUS[j.status] || STATUS.scheduled;
-    const meta = [j.crew, j.location].filter(Boolean).join(" · ");
-    return el("button", {class: `job ${st.cls}`, title: hoverText(j), onclick: () => details(j)},
-      el("span", {class: "stripe", "aria-hidden": "true"}),
-      el("span", {class: "main"},
-        j.jobNo ? el("span", {class: "no", text: j.jobNo}) : null,
-        el("span", {class: "name", text: j.title || "Untitled job"}),
-        meta ? el("span", {class: "meta", text: meta}) : null,
-        j.notes ? el("span", {class: "notes", text: j.notes}) : null,
-        j.endDate && j.endDate > j.date ? el("span", {class: "meta", text: `${fmtShort(parse(j.date))} – ${fmtShort(parse(j.endDate))}`}) : null,
-        awaiting(j) ? el("span", {class: "flag", text: "Field work done · waiting on office"}) : null),
-      el("span", {class: "pill"}, el("span", {class: "lbl", text: st.label})));
+    return el("button", {class: `card ${st.cls}`, title: hoverText(j), onclick: () => details(j)},
+      j.jobNo ? el("span", {class: "no", text: j.jobNo}) : null,
+      el("span", {class: "name", text: j.title || "Untitled job"}),
+      el("span", {class: "meta", text: [j.crew, j.location].filter(Boolean).join(" · ")}),
+      j.endDate && j.endDate > j.date ? el("span", {class: "meta", text: `${fmtShort(parse(j.date))} – ${fmtShort(parse(j.endDate))}`}) : null,
+      j.notes ? el("span", {class: "notes", text: j.notes}) : null,
+      el("span", {class: "status"}, el("span", {class: "dot"}), st.label),
+      awaiting(j) ? el("span", {class: "flag", text: "Field done · waiting on office"}) : null);
   }
-  // clicking anything shows its details first, with an Edit button
-  const offChip = (o, day) => el("button", {class: "offchip", title: hoverText(o), onclick: () => details(o, day),
-    text: offLabel(o) + (o.repeat ? " ↻" : "")});
+  const offChip = (o, day, short) => el("button", {class: "offchip", title: hoverText(o), onclick: () => details(o, day),
+    text: short ? (o.crew || "?") : offLabel(o) + (o.repeat ? " ↻" : "")});
+  const jobChip = j => el("button", {class: `chip ${(STATUS[j.status] || STATUS.scheduled).cls}`, title: hoverText(j), onclick: () => details(j)},
+    j.crew ? el("b", {text: j.crew + " "}) : null, [j.jobNo, j.title || "Untitled"].filter(Boolean).join(" "));
+
+  // Sun / Sat columns stay as narrow as their label unless something is scheduled on them
+  const NARROW = () => isPhone() ? "28px" : "44px";
+  function columns(days) {
+    const used = w => days.some(ds => parse(ds).getDay() === w && (jobsOn(ds).length || offsOn(ds).length));
+    const sun = used(0), sat = used(6);
+    return {sun, sat, css: `${sun ? "minmax(0,1fr)" : NARROW()} repeat(5, minmax(0,1fr)) ${sat ? "minmax(0,1fr)" : NARROW()}`};
+  }
 
   // ---------- views ----------
-  function renderWeek() {
-    const start = weekStart(anchor), t = todayStr();
-    $("range").textContent = `${fmtShort(start)} – ${fmtShort(addDays(start, 6))}, ${addDays(start, 6).getFullYear()}`;
-    const out = [];
-    for (let i = 0; i < 7; i++) {
-      const d = addDays(start, i), ds = ymd(d);
-      const list = jobs.filter(j => covers(j, ds)).sort(byOrder);
-      const dayOffs = offs.filter(o => occurs(o, ds)).sort(byOrder);
-      if ((i === 0 || i === 6) && !list.length && !dayOffs.length && ds !== t) continue;
-      out.push(el("section", {class: "day" + (ds === t ? " today" : "")},
-        el("h2", {}, el("span", {text: fmtDay(d)}), ds === t ? el("span", {class: "tag", text: "Today"}) : null, dayOffs.map(o => offChip(o, ds))),
-        list.length ? el("div", {class: "jobs"}, list.map(jobCard)) : el("div", {class: "none", text: "No field work scheduled"})));
-    }
-    return el("div", {class: "days"}, out);
-  }
   function renderMonth() {
     const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1), t = todayStr();
-    $("range").textContent = first.toLocaleDateString(undefined, {month: "long", year: "numeric"});
-    const cells = DOW.map(d => el("div", {class: "dow", text: d}));
-    const end = addDays(weekStart(new Date(first.getFullYear(), first.getMonth() + 1, 0)), 6);
-    for (let d = weekStart(first); d <= end; d = addDays(d, 1)) {
-      const ds = ymd(d), day = new Date(d), list = jobs.filter(j => covers(j, ds)).sort(byOrder);
-      cells.push(el("div", {class: "cell" + (d.getMonth() !== first.getMonth() ? " out" : "") + (ds === t ? " today" : "")},
-        el("button", {class: "d", text: d.getDate(), "aria-label": "Open week of " + fmtDay(d), onclick: () => { anchor = day; setView("week"); }}),
-        offs.filter(o => occurs(o, ds)).sort(byOrder).map(o => offChip(o, ds)),
-        list.map(j => el("button", {class: `chip ${(STATUS[j.status] || STATUS.scheduled).cls}`,
-          title: hoverText(j),
-          onclick: () => details(j)},
-          j.crew ? el("b", {text: j.crew + " "}) : null, [j.jobNo, j.title || "Untitled"].filter(Boolean).join(" ")))));
+    $("range").textContent = first.toLocaleDateString(undefined, isPhone() ? {month: "short", year: "numeric"} : {month: "long", year: "numeric"});
+    const start = weekStart(first), end = addDays(weekStart(new Date(first.getFullYear(), first.getMonth() + 1, 0)), 6);
+    const days = []; for (let d = new Date(start); d <= end; d = addDays(d, 1)) days.push(ymd(d));
+    const cols = columns(days), weeks = days.length / 7;
+    const cells = DOW.map((d, i) => el("div", {class: "dow", text: (i === 0 && !cols.sun) || (i === 6 && !cols.sat) ? d.slice(0, isPhone() ? 2 : 3) : d}));
+    for (const ds of days) {
+      const d = parse(ds), w = d.getDay(), narrow = (w === 0 && !cols.sun) || (w === 6 && !cols.sat);
+      cells.push(el("div", {class: "cell" + (d.getMonth() !== first.getMonth() ? " out" : "") + (ds === t ? " today" : "") + (narrow ? " narrow" : "")},
+        el("button", {class: "d", text: d.getDate(), "aria-label": "Open week of " + fmtDay(d), onclick: () => { anchor = d; setView("week"); }}),
+        offsOn(ds).map(o => offChip(o, ds, narrow)),
+        jobsOn(ds).map(jobChip)));
     }
-    return el("div", {class: "month-wrap"}, el("div", {class: "month"}, cells));
+    return el("div", {class: "grid", style: `grid-template-columns:${cols.css};grid-template-rows:auto repeat(${weeks}, minmax(0,1fr))`}, cells);
+  }
+  function weekDays() { const s = weekStart(anchor); return [...Array(7)].map((_, i) => ymd(addDays(s, i))); }
+  function weekRange(days) {
+    const a = parse(days[0]), b = parse(days[6]);
+    $("range").textContent = `${fmtShort(a)} – ${fmtShort(b)}${isPhone() ? "" : ", " + b.getFullYear()}`;
+  }
+  function renderWeekColumns() {
+    const days = weekDays(), t = todayStr(), cols = columns(days); weekRange(days);
+    return el("div", {class: "grid", style: `grid-template-columns:${cols.css};grid-template-rows:minmax(0,1fr)`},
+      days.map(ds => {
+        const d = parse(ds), w = d.getDay(), narrow = (w === 0 && !cols.sun) || (w === 6 && !cols.sat), list = jobsOn(ds), dayOffs = offsOn(ds);
+        return el("div", {class: "wkcol" + (ds === t ? " today" : "") + (narrow ? " narrow" : "")},
+          el("div", {class: "wkhead"}, narrow ? DOW[w] : d.toLocaleDateString(undefined, {weekday: "short"}).toUpperCase(), el("span", {class: "num", text: d.getDate()})),
+          el("div", {class: "wkbody"}, dayOffs.map(o => offChip(o, ds, narrow)), list.map(jobCard),
+            !narrow && !list.length && !dayOffs.length ? el("div", {class: "none", text: "No field work"}) : null));
+      }));
+  }
+  function renderWeekList() {
+    const days = weekDays(), t = todayStr(); weekRange(days);
+    return el("div", {class: "wklist"}, days.map((ds, i) => {
+      const d = parse(ds), list = jobsOn(ds), dayOffs = offsOn(ds);
+      if ((i === 0 || i === 6) && !list.length && !dayOffs.length && ds !== t) return null;
+      return el("section", {class: "wkday" + (ds === t ? " today" : "")},
+        el("h2", {}, el("span", {text: fmtDay(d)}), ds === t ? el("span", {class: "tag", text: "Today"}) : null, dayOffs.map(o => offChip(o, ds, false))),
+        list.length ? list.map(jobCard) : el("div", {class: "none", text: "No field work scheduled"}));
+    }));
   }
   function renderEmpty() {
     return el("div", {class: "panel"},
       el("h3", {text: loaded ? "No jobs on the schedule yet" : "Loading the schedule…"}),
-      loaded ? el("p", {text: canEdit() ? "Add the first field job with + Job, or time off with + Time off. New jobs start red until the office processes the field data." : "No jobs have been added yet."}) : null);
+      loaded ? el("p", {text: "Add a field job with + Job, or time off with + Time off. New jobs start red until the office processes the field data."}) : null);
   }
   function render() {
-    renderSummary();
+    renderSummary(); renderInfo();
     $("vWeek").setAttribute("aria-pressed", String(view === "week"));
     $("vMonth").setAttribute("aria-pressed", String(view === "month"));
-    const body = view === "week" ? renderWeek() : renderMonth();
-    $("view").replaceChildren(!jobs.length && !offs.length ? renderEmpty() : body);
+    const body = view === "month" ? renderMonth() : isPhone() ? renderWeekList() : renderWeekColumns();
+    $("view").replaceChildren(!jobs.length && !offs.length && !loaded ? renderEmpty() : body);
     $("addBtns").hidden = !canEdit() || $("app").hidden;
   }
   function setView(v) { view = v; store.set("view", v); render(); }
@@ -449,14 +541,17 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   $("next").onclick = () => { anchor = view === "week" ? addDays(anchor, 7) : new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1); render(); };
   $("addBtn").onclick = () => openJob(null);
   $("addOff").onclick = () => openOff(null, {date: ymd(view === "week" && weekStart(anchor) > new Date() ? weekStart(anchor) : new Date())});
+  let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (!$("app").hidden) render(); }, 120); });
 
   let toastT;
   function toast(m) { const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
   function showNotice(t) { $("notice").textContent = t; $("notice").hidden = false; }
 
   // ---------- sheets ----------
-  function sheet(label, ...content) {
-    const box = el("div", {class: "sheet", role: "dialog", "aria-modal": "true", "aria-label": label}, ...content);
+  function sheet(title, ...content) {
+    const box = el("div", {class: "sheet", role: "dialog", "aria-modal": "true", "aria-label": title},
+      el("div", {class: "sh"}, el("h3", {text: title}), el("button", {class: "x", type: "button", "aria-label": "Close", text: "×", onclick: () => close()})),
+      el("div", {class: "sb"}, ...content));
     const scrim = el("div", {class: "scrim", onclick: e => { if (e.target === scrim) close(); }}, box);
     const onKey = e => { if (e.key === "Escape") close(); };
     function close() { scrim.remove(); document.removeEventListener("keydown", onKey); }
@@ -466,14 +561,16 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   }
   const stampText = e => e.updatedBy || e.updatedAt
     ? `Last updated${e.updatedBy ? " by " + e.updatedBy : ""}${e.updatedAt ? " · " + new Date(e.updatedAt).toLocaleString(undefined, {month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}) : ""}` : "";
+  // force capitals as people type (keeps the cursor where it was)
+  const capsInput = props => { const i = el("input", {...props, class: "caps", autocapitalize: "characters", autocomplete: "off", spellcheck: "false"});
+    i.addEventListener("input", () => { const a = i.selectionStart, b = i.selectionEnd; i.value = i.value.toUpperCase(); try { i.setSelectionRange(a, b); } catch {} }); return i; };
 
   // details view: shown on click, with an Edit button
   function details(e, day) {
     const isOff = e.kind === "off", st = STATUS[e.status] || STATUS.scheduled;
     const row = (k, v) => v ? [el("dt", {text: k}), el("dd", {text: v})] : null;
-    const s = sheet("Details",
-      el("h3", {text: isOff ? offLabel(e) : (e.title || "Untitled job")}),
-      isOff ? null : el("span", {class: `pill ${st.cls}`, style: "align-self:flex-start"}, el("span", {class: "lbl", text: st.label})),
+    const s = sheet(isOff ? offLabel(e) : (e.title || "Untitled job"),
+      isOff ? null : el("span", {class: `pill ${st.cls}`}, st.label),
       el("dl", {class: "facts"},
         row("Job", e.jobNo), row(isOff ? "Who" : "Crew", e.crew),
         e.repeat ? row("Repeats", repeatText(e)) : row("Date", fmtDay(parse(e.date)) + (e.endDate && e.endDate > e.date ? " – " + fmtDay(parse(e.endDate)) : "")),
@@ -492,20 +589,18 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     const statusBtns = Object.entries(STATUS).map(([k, s]) => el("button", {type: "button", class: s.cls, "aria-pressed": String(draft.status === k),
       onclick: e => { draft.status = k; statusBtns.forEach(b => b.setAttribute("aria-pressed", String(b === e.currentTarget))); }}, s.label));
     const inp = (id, v, ph, extra = {}) => el("input", {id, value: v || "", placeholder: ph, ...extra});
-    const iNo = inp("f_jobNo", draft.jobNo, "e.g. 42021.200"), iCrew = inp("f_crew", draft.crew, "e.g. RR/TM", {autocapitalize: "characters"});
+    const iNo = inp("f_jobNo", draft.jobNo, "e.g. 42021.200", {inputmode: "decimal"});
+    const iCrew = capsInput({id: "f_crew", value: draft.crew || "", placeholder: "e.g. RR/SR"});
     const iTitle = inp("f_title", draft.title, "Job name or site"), iLoc = inp("f_location", draft.location, "Address, township/range, etc.");
     const iDate = inp("f_date", draft.date, "", {type: "date"}), iEnd = inp("f_endDate", draft.endDate, "", {type: "date"});
     const iNotes = el("textarea", {id: "f_notes"}); iNotes.value = draft.notes || "";
     const err = el("p", {class: "err", hidden: true});
-    const confirmBox = el("div", {class: "confirm", hidden: true}, el("span", {text: "Delete this job for everyone?"}),
-      el("button", {class: "btn danger", type: "button", text: "Delete", onclick: doDelete}),
+    const what = job ? [job.jobNo, job.title].filter(Boolean).join(" ") : "";
+    const confirmBox = el("div", {class: "confirm", hidden: true}, el("span", {text: `Delete ${what || "this job"} for everyone?`}),
+      el("button", {class: "btn", type: "button", text: "Delete", onclick: doDelete}),
       el("button", {class: "btn", type: "button", text: "Keep", onclick: () => confirmBox.hidden = true}));
     const saveBtn = el("button", {class: "btn primary", type: "submit", text: isNew ? "Add job" : "Save"});
     const form = el("form", {style: "display:contents"},
-      el("h3", {text: isNew ? "Add field job" : (job.title || "Job")}),
-      isNew ? el("div", {class: "kindset", role: "group", "aria-label": "Entry type"},
-        el("button", {type: "button", "aria-pressed": "true", text: "Field job"}),
-        el("button", {type: "button", "aria-pressed": "false", text: "Time off", onclick: () => { s.close(); openOff(null, {date: iDate.value, crew: iCrew.value}); }})) : null,
       el("div", {class: "statusset", role: "group", "aria-label": "Processing status"}, statusBtns),
       el("div", {class: "fields"},
         el("label", {class: "f", for: "f_jobNo"}, "Job number", iNo),
@@ -518,10 +613,10 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
       !isNew && stampText(job) ? el("p", {class: "stamp", text: stampText(job)}) : null,
       err, confirmBox,
       el("div", {class: "actions"},
-        !isNew ? el("button", {class: "btn danger", type: "button", text: "Delete", onclick: () => confirmBox.hidden = false}) : el("span"),
+        !isNew ? el("button", {class: "btn", type: "button", text: "Delete", onclick: () => confirmBox.hidden = false}) : el("span"),
         el("div", {class: "right"}, el("button", {class: "btn", type: "button", text: "Cancel", onclick: () => s.close()}), saveBtn)));
-    const s = sheet(isNew ? "Add job" : "Edit job", form);
-    (isNew ? iTitle : statusBtns.find(b => b.getAttribute("aria-pressed") === "true"))?.focus();
+    const s = sheet(isNew ? "Add field job" : "Edit job", form);
+    (isNew ? iNo : statusBtns.find(b => b.getAttribute("aria-pressed") === "true"))?.focus();
 
     form.addEventListener("submit", async e => {
       e.preventDefault(); err.hidden = true;
@@ -531,8 +626,8 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
       if (!item.date) { err.textContent = "Pick a field date."; err.hidden = false; return; }
       if (!item.title && !item.jobNo) { err.textContent = "Enter a job name or job number."; err.hidden = false; return; }
       saveBtn.disabled = true;
-      const what = item.jobNo || item.title;
-      const msg = isNew ? `Add ${what}` : (job.status !== item.status ? `Mark ${what} ${STATUS[item.status].label.toLowerCase()}` : `Edit ${what}`);
+      const w = item.jobNo || item.title;
+      const msg = isNew ? `Add ${w}` : (job.status !== item.status ? `Mark ${w} ${STATUS[item.status].label.toLowerCase()}` : `Edit ${w}`);
       try { await save(upsert(item), msg); s.close(); toast(isNew ? "Job added" : "Saved"); }
       catch (ex) { saveBtn.disabled = false; err.textContent = saveError(ex); err.hidden = false; }
     });
@@ -543,13 +638,15 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   }
 
   function openOff(entry, seed = {}, onDay) {
-    if (!canEdit()) { if (entry) details(entry); return; }
+    if (!canEdit()) { if (entry) details(entry, onDay); return; }
     const isNew = !entry;
     const d = isNew ? {offType: "Off", crew: seed.crew || "", date: seed.date || todayStr(), endDate: "", notes: ""} : {...entry};
     const types = [["Off", "All day"], ["Out", "Part of the day"]].map(([k, sub]) =>
       el("button", {type: "button", "aria-pressed": String(d.offType === k),
         onclick: e => { d.offType = k; types.forEach(b => b.setAttribute("aria-pressed", String(b === e.currentTarget))); }}, k, el("small", {text: sub})));
-    const iWho = el("input", {id: "o_crew", value: d.crew, placeholder: "Initials, e.g. TM", autocapitalize: "characters"});
+    const people = CREW.includes(d.crew) || !d.crew ? CREW : [...CREW, d.crew];
+    const iWho = el("select", {id: "o_crew"}, el("option", {value: "", text: "Choose…", disabled: true, selected: !d.crew}),
+      people.map(p => el("option", {value: p, text: p, selected: p === d.crew})));
     const iFrom = el("input", {id: "o_date", type: "date", value: d.date});
     const iTo = el("input", {id: "o_end", type: "date", value: d.endDate || ""});
     const iNote = el("textarea", {id: "o_notes", placeholder: "Optional, e.g. back at 1pm"}); iNote.value = d.notes || "";
@@ -564,16 +661,12 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     const err = el("p", {class: "err", hidden: true});
     const oneDay = !isNew && entry.repeat && onDay;
     const confirmBox = el("div", {class: "confirm", hidden: true},
-      el("span", {text: oneDay ? "Remove which days?" : "Remove this time off?"}),
-      oneDay ? el("button", {class: "btn danger", type: "button", text: "Just " + fmtShort(parse(onDay)), onclick: () => doDelete(false)}) : null,
-      el("button", {class: "btn danger", type: "button", text: oneDay ? "All of them" : "Remove", onclick: () => doDelete(true)}),
+      el("span", {text: oneDay ? `Remove ${offLabel(entry)} for which days?` : `Remove ${entry ? offLabel(entry) : "this time off"} for everyone?`}),
+      oneDay ? el("button", {class: "btn", type: "button", text: "Just " + fmtShort(parse(onDay)), onclick: () => doDelete(false)}) : null,
+      el("button", {class: "btn", type: "button", text: oneDay ? "All of them" : "Remove", onclick: () => doDelete(true)}),
       el("button", {class: "btn", type: "button", text: "Keep", onclick: () => confirmBox.hidden = true}));
     const saveBtn = el("button", {class: "btn primary", type: "submit", text: isNew ? "Add time off" : "Save"});
     const form = el("form", {style: "display:contents"},
-      el("h3", {text: isNew ? "Add time off" : offLabel(d)}),
-      isNew ? el("div", {class: "kindset", role: "group", "aria-label": "Entry type"},
-        el("button", {type: "button", "aria-pressed": "false", text: "Field job", onclick: () => { s.close(); openJob(null); }}),
-        el("button", {type: "button", "aria-pressed": "true", text: "Time off"})) : null,
       el("div", {class: "typeset", role: "group", "aria-label": "Type"}, types),
       el("div", {class: "fields"},
         el("label", {class: "f full", for: "o_crew"}, "Who", iWho),
@@ -586,20 +679,20 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
       !isNew && stampText(entry) ? el("p", {class: "stamp", text: stampText(entry)}) : null,
       err, confirmBox,
       el("div", {class: "actions"},
-        !isNew ? el("button", {class: "btn danger", type: "button", text: "Remove", onclick: () => confirmBox.hidden = false}) : el("span"),
+        !isNew ? el("button", {class: "btn", type: "button", text: "Remove", onclick: () => confirmBox.hidden = false}) : el("span"),
         el("div", {class: "right"}, el("button", {class: "btn", type: "button", text: "Cancel", onclick: () => s.close()}), saveBtn)));
-    const s = sheet(isNew ? "Add time off" : "Time off", form);
+    const s = sheet(isNew ? "Add time off" : "Edit time off", form);
     hint(); iWho.focus();
     form.addEventListener("submit", async e => {
       e.preventDefault(); err.hidden = true;
-      const item = stamp({id: entry?.id || newId(), kind: "off", offType: d.offType, crew: iWho.value.trim().toUpperCase(),
+      const item = stamp({id: entry?.id || newId(), kind: "off", offType: d.offType, crew: iWho.value,
         date: iFrom.value, endDate: iTo.value && iTo.value > iFrom.value ? iTo.value : "", notes: iNote.value.trim()});
       if (iRep.value !== "0") {
         item.repeat = {every: +iRep.value, until: iUntil.value && iUntil.value >= iFrom.value ? iUntil.value : ""};
         const keep = (entry?.skip || []).filter(x => x >= item.date);
         if (keep.length) item.skip = keep;
       }
-      if (!item.crew || !item.date) { err.textContent = "Enter who is off and the first day."; err.hidden = false; return; }
+      if (!item.crew || !item.date) { err.textContent = "Choose who is off and the first day."; err.hidden = false; return; }
       saveBtn.disabled = true;
       try { await save(upsert(item), `${isNew ? "Add" : "Edit"} time off: ${offLabel(item)} ${item.date}`); s.close(); toast(isNew ? "Time off added" : "Saved"); }
       catch (ex) { saveBtn.disabled = false; err.textContent = saveError(ex); err.hidden = false; }
@@ -615,9 +708,9 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   }
 
   // ---------- lock screen ----------
-  function gate(...content) { $("gate").replaceChildren(...content); $("gate").hidden = false; $("app").hidden = true; $("addBtns").hidden = true; $("who").hidden = true; }
+  function gate(...content) { $("gate").replaceChildren(...content); $("gate").hidden = false; $("app").hidden = true; $("addBtns").hidden = true; renderInfo(); }
   function lock(why) {
-    session = null; store.del("session"); docData = {v: 1, jobs: []}; jobs = []; offs = []; sha = null; etag = null; loaded = false;
+    session = null; store.del("session"); docData = {v: 1, jobs: []}; jobs = []; offs = []; sha = null; etag = null; loaded = false; lastSync = "";
     const pass = el("input", {id: "pass", type: "password", autocomplete: "current-password", placeholder: "Passcode", enterkeyhint: "go"});
     const err = el("p", {class: "err", hidden: !why, text: why || ""});
     const go = el("button", {class: "btn primary", type: "submit", text: "Open"});
@@ -647,10 +740,9 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     gate(form);
     pass.focus();
   }
-  $("lockBtn").onclick = () => lock();
 
   function askName(then) {
-    const inp = el("input", {id: "myname", placeholder: "e.g. Ann", value: myName, autocomplete: "given-name"});
+    const inp = el("input", {id: "myname", placeholder: "e.g. Ann", value: myName, autocomplete: "name"});
     const form = el("form", {style: "display:contents"},
       el("h3", {text: "What's your name?"}),
       el("p", {text: "It's shown next to the changes you make, so others know who updated a job."}),
@@ -661,9 +753,7 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
 
   function enterApp() {
     if (canEdit() && !myName) return askName(enterApp);
-    $("gate").hidden = true; $("app").hidden = false; $("who").hidden = false;
-    $("modeTag").hidden = canEdit(); $("modeTag").textContent = "View only";
-    $("whoName").textContent = canEdit() ? myName : "";
+    $("gate").hidden = true; $("app").hidden = false;
     render(); load(true);
   }
 
@@ -708,6 +798,7 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   setInterval(() => { if (session && !document.hidden && !$("sheetHost").firstChild) load(false); }, 60000);
   document.addEventListener("visibilitychange", () => { if (session && !document.hidden) load(false); });
   window.addEventListener("hashchange", () => location.reload());
+  renderInfo();
   if (location.hash === "#setup") setupScreen();
   else if (!window.crypto?.subtle) gate(el("h3", {text: "This browser can't open the schedule"}), el("p", {text: "Open the page from its https:// address in an up-to-date browser."}));
   else if (session && session.token) enterApp();
