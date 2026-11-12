@@ -157,6 +157,11 @@ a{color:var(--wc-link)}
 .card .status{display:flex;align-items:center;gap:5px;font-size:12px;line-height:16px;font-weight:500}
 .card .status .dot{background:var(--ink);opacity:.85}
 .card .flag{font-size:12px;line-height:16px;font-weight:700}
+.card .tasks{font-size:12px;line-height:16px;font-weight:700;overflow-wrap:anywhere}
+/* ?? tentative: possible, not set. Same status fill, with stripes and a dashed edge */
+.chip.tent, .card.tent{background-image:repeating-linear-gradient(135deg, rgb(255 255 255 / .2) 0 4px, transparent 4px 12px);outline:2px dashed var(--wc-text);outline-offset:-2px}
+.tq{font-weight:700;letter-spacing:.02em}
+.card .tq{align-self:flex-start;background:var(--ink);color:var(--c);border-radius:3px;padding:0 5px;font-size:12px;line-height:16px}
 .none{font-size:12px;color:var(--fs-none);padding:2px}
 
 /* phone week list (scrolls inside the calendar area only) */
@@ -206,10 +211,28 @@ a{color:var(--wc-link)}
 .typeset button[aria-pressed="true"]{border-color:var(--fs-accent);background:var(--wc-bg-tint)}
 .fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .fields .full{grid-column:1/-1}
-label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;line-height:16px;font-weight:500;color:var(--wc-text);letter-spacing:.04em;text-transform:uppercase}
+label.f, div.f{display:flex;flex-direction:column;gap:4px;font-size:12px;line-height:16px;font-weight:500;color:var(--wc-text);letter-spacing:.04em;text-transform:uppercase}
 input,textarea,select{border:1px solid var(--fs-input);background:var(--wc-white);border-radius:6px;padding:8px 10px;font-size:16px;line-height:22px;width:100%;min-width:0;text-transform:none;letter-spacing:0}
 input:focus,textarea:focus,select:focus{border-color:var(--wc-primary);outline:none;box-shadow:0 0 0 2px var(--wc-bg-tint)}
 input.caps{text-transform:uppercase}
+.crewpair{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.crewpair select{padding-right:4px}
+.multi{position:relative}
+.multi > summary{list-style:none;cursor:pointer;border:1px solid var(--fs-input);background:var(--wc-white);border-radius:6px;padding:8px 32px 8px 10px;font-size:16px;line-height:22px;text-transform:none;letter-spacing:0;font-weight:400;position:relative;overflow-wrap:anywhere}
+.multi > summary::-webkit-details-marker{display:none}
+.multi > summary::after{content:"";position:absolute;right:12px;top:50%;width:8px;height:8px;border-right:2px solid var(--wc-muted);border-bottom:2px solid var(--wc-muted);transform:translateY(-70%) rotate(45deg)}
+.multi[open] > summary{border-color:var(--wc-primary);box-shadow:0 0 0 2px var(--wc-bg-tint)}
+.multi > summary .ph{color:var(--wc-muted)}
+.multi .opts{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;border:1px solid var(--wc-border);border-top:0;border-radius:0 0 6px 6px;padding:6px 10px 10px;background:var(--wc-white)}
+.multi .opt{display:flex;align-items:center;gap:8px;font-size:14px;line-height:18px;text-transform:none;letter-spacing:0;font-weight:400;padding:5px 0;cursor:pointer}
+.multi .opt input[type=checkbox]{width:18px;height:18px;flex:none;margin:0;accent-color:var(--wc-primary)}
+.multi .fill{grid-column:1/-1;display:flex;align-items:center;gap:8px}
+.multi .fill input[type=text]{padding:5px 8px;font-size:15px}
+.multi .done{grid-column:1/-1;justify-self:end;margin-top:4px}
+.tentrow{display:flex;align-items:center;gap:10px;border:2px solid var(--wc-border);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:14px;line-height:18px}
+.tentrow input{width:20px;height:20px;margin:0;flex:none;accent-color:var(--wc-primary)}
+.tentrow small{display:block;color:var(--wc-muted);font-size:12px}
+.tentrow:has(input:checked){border-color:var(--fs-accent);background:var(--wc-bg-tint)}
 textarea{min-height:64px;resize:vertical}
 dl.facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;margin:0;font-size:14px}
 dl.facts dt{color:var(--wc-muted);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding-top:1px}
@@ -324,8 +347,9 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
 (() => {
   "use strict";
   // ===================== settings =====================
-  const APP = {name: "Field Schedule", version: "1.5.0"};
-  const CREW = ["MH", "RR", "SR", "TM", "TT"];                // initials offered for time off
+  const APP = {name: "Field Schedule", version: "1.6.0"};
+  const CREW = ["MH", "RR", "SR", "TM", "TT"];                // crew initials
+  const TASKS = ["Mon Search", "Set Control", "Scan", "Flight", "Stake Curb", "Stake Fence", "Stake Signs", "Stake Sewer", "Stake Storm", "Stake Striping", "Stake Sawcuts", "Stake Water"];
   const SUPPORT_EMAIL = "ttucker@welchcomer.com";
   const KEYS_FILE = "keys.json";          // made by the setup screen (#setup); holds the GitHub key, locked with the team passcode
   const ITERATIONS = 250000;              // passcode stretching (PBKDF2-SHA256)
@@ -418,7 +442,8 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
 
   const endOf = j => j.endDate && j.endDate >= j.date ? j.endDate : j.date;
   const covers = (j, day) => j.date <= day && endOf(j) >= day;
-  const awaiting = j => (j.status || "scheduled") === "scheduled" && endOf(j) < todayStr();
+  const awaiting = j => !j.tentative && (j.status || "scheduled") === "scheduled" && endOf(j) < todayStr();
+  const taskText = j => (j.tasks || []).join(", ");
   const dayNum = s => { const [y, m, d] = s.split("-").map(Number); return Date.UTC(y, m - 1, d) / 86400000; };
   // time off can repeat every N weeks (same weekday as its first day), until an optional date, minus skipped days
   const occurs = (o, day) => {
@@ -568,14 +593,16 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
 
   // ---------- items ----------
   // tooltip: the typed notes (general task), then any processing notes
-  const hoverText = e => [e.notes, e.procNotes ? "Processing: " + e.procNotes : ""].filter(Boolean).join("\n") || undefined;
+  const hoverText = e => [e.tentative ? "?? Tentative, not set yet" : "", e.kind === "off" ? "" : taskText(e), e.notes, e.procNotes ? "Processing: " + e.procNotes : ""].filter(Boolean).join("\n") || undefined;
   function jobCard(j, day) {
     const st = STATUS[j.status] || STATUS.scheduled;
-    return draggable(el("button", {class: `card ${st.cls}`, title: hoverText(j), onclick: () => { if (!suppressClick) details(j); }},
+    return draggable(el("button", {class: `card ${st.cls}${j.tentative ? " tent" : ""}`, title: hoverText(j), onclick: () => { if (!suppressClick) details(j); }},
+      j.tentative ? el("span", {class: "tq", text: "?? Tentative"}) : null,
       j.jobNo ? el("span", {class: "no", text: j.jobNo}) : null,
       el("span", {class: "name", text: j.title || "Untitled job"}),
       el("span", {class: "meta", text: [j.crew, j.location].filter(Boolean).join(" · ")}),
       j.endDate && j.endDate > j.date ? el("span", {class: "meta", text: `${fmtShort(parse(j.date))} – ${fmtShort(parse(j.endDate))}`}) : null,
+      j.tasks?.length ? el("span", {class: "tasks", text: taskText(j)}) : null,
       j.notes ? el("span", {class: "notes", text: j.notes}) : null,
       j.procNotes ? el("span", {class: "proc"}, el("b", {text: "Processing: "}), j.procNotes) : null,
       el("span", {class: "status"}, el("span", {class: "dot"}), st.label),
@@ -583,8 +610,8 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
   }
   const offChip = (o, day, short) => el("button", {class: "offchip " + (o.offType === "Out" ? "out" : "off"), title: hoverText(o), onclick: () => details(o, day),
     text: short ? (o.crew || "?") : offLabel(o) + (o.repeat ? " ↻" : "")});
-  const jobChip = (j, day) => draggable(el("button", {class: `chip ${(STATUS[j.status] || STATUS.scheduled).cls}`, title: hoverText(j), onclick: () => { if (!suppressClick) details(j); }},
-    j.crew ? el("b", {text: j.crew + " "}) : null, [j.jobNo, j.title || "Untitled"].filter(Boolean).join(" ")), j, day);
+  const jobChip = (j, day) => draggable(el("button", {class: `chip ${(STATUS[j.status] || STATUS.scheduled).cls}${j.tentative ? " tent" : ""}`, title: hoverText(j), onclick: () => { if (!suppressClick) details(j); }},
+    j.tentative ? el("span", {class: "tq", text: "?? "}) : null, j.crew ? el("b", {text: j.crew + " "}) : null, [j.jobNo, j.title || "Untitled"].filter(Boolean).join(" ")), j, day);
 
   // Sun / Sat columns stay as narrow as their label unless a job is scheduled on them
   const NARROW = () => isPhone() ? "28px" : "44px";
@@ -799,13 +826,14 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
     const isOff = e.kind === "off", st = STATUS[e.status] || STATUS.scheduled;
     const row = (k, v) => v ? [el("dt", {text: k}), el("dd", {text: v})] : null;
     const s = sheet(isOff ? offLabel(e) : (e.title || "Untitled job"),
-      isOff ? null : el("span", {class: `pill ${st.cls}`}, st.label),
+      isOff ? null : el("span", {class: `pill ${st.cls}`}, st.label + (e.tentative ? " · ?? Tentative" : "")),
       el("dl", {class: "facts"},
         row("Job", e.jobNo), row(isOff ? "Who" : "Crew", e.crew),
         isOff ? row("Type", e.offType === "Out" ? "Out part of the day" + (e.time ? " · " + longTime(e.time) : "") : "Off all day") : null,
         e.repeat ? row("Repeats", repeatText(e)) : row("Date", fmtDay(parse(e.date)) + (e.endDate && e.endDate > e.date ? " – " + fmtDay(parse(e.endDate)) : "")),
         e.repeat && day ? row("This day", fmtDay(parse(day))) : null,
-        row("Location", e.location), row(isOff ? "Note" : "General task", e.notes), isOff ? null : row("Processing notes", e.procNotes)),
+        isOff ? null : row("Schedule", e.tentative ? "?? Tentative, not set yet" : ""),
+        row("Location", e.location), isOff ? null : row("General tasks", taskText(e)), row(isOff ? "Note" : "Notes", e.notes), isOff ? null : row("Processing notes", e.procNotes)),
       stampText(e) ? el("p", {class: "stamp", text: stampText(e)}) : null,
       el("div", {class: "actions"},
         canEdit() ? el("button", {class: "btn primary", type: "button", text: "Edit", onclick: () => { s.close(); isOff ? openOff(e, {}, day) : openJob(e); }}) : el("span"),
@@ -820,10 +848,35 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
       onclick: e => { draft.status = k; statusBtns.forEach(b => b.setAttribute("aria-pressed", String(b === e.currentTarget))); }}, s.label));
     const inp = (id, v, ph, extra = {}) => el("input", {id, value: v || "", placeholder: ph, ...extra});
     const iNo = inp("f_jobNo", draft.jobNo, "e.g. 42021.200", {inputmode: "decimal"});
-    const iCrew = capsInput({id: "f_crew", value: draft.crew || "", placeholder: "e.g. RR/SR"});
+    // crew: first person, plus an optional second (saved as "RR/SR")
+    const [c1 = "", c2 = "", ...cRest] = (draft.crew || "").toUpperCase().split(/[\/,&+ ]+/).filter(Boolean);
+    const crewSel = (id, v, first) => el("select", {id, "aria-label": first ? "Crew member" : "Second crew member (optional)"},
+      el("option", {value: "", text: first ? "–" : "+ 2nd", selected: !v}),
+      (CREW.includes(v) || !v ? CREW : [...CREW, v]).map(p => el("option", {value: p, text: p, selected: p === v})));
+    const iCrew1 = crewSel("f_crew", c1, true), iCrew2 = crewSel("f_crew2", [c2, ...cRest].join("/"), false);
+    // general tasks: pick any number, plus "Stake ____" to type
+    const have = new Set(draft.tasks || []);
+    const extra = [...have].filter(t => !TASKS.includes(t));
+    const fillVal = (extra.find(t => /^stake\s/i.test(t)) || "").replace(/^stake\s+/i, "");
+    const others = extra.filter(t => !/^stake\s/i.test(t));
+    const boxes = [...TASKS, ...others].map(t => el("input", {type: "checkbox", value: t, checked: have.has(t)}));
+    const fillBox = el("input", {type: "checkbox", "aria-label": "Stake, other", checked: !!fillVal});
+    const fillTxt = el("input", {type: "text", id: "f_stake", value: fillVal, placeholder: "what?", autocomplete: "off", "aria-label": "Stake what"});
+    const pickedTasks = () => [...boxes.filter(b => b.checked).map(b => b.value), ...(fillBox.checked && fillTxt.value.trim() ? ["Stake " + fillTxt.value.trim()] : [])];
+    const sumText = el("span");
+    const showSum = () => { const t = pickedTasks(); sumText.className = t.length ? "" : "ph"; sumText.textContent = t.length ? t.join(", ") : "Choose tasks…"; };
+    const multi = el("details", {class: "multi", id: "f_tasks"}, el("summary", {}, sumText),
+      el("div", {class: "opts"},
+        boxes.map(b => el("label", {class: "opt"}, b, b.value)),
+        el("div", {class: "fill"}, el("label", {class: "opt"}, fillBox, "Stake"), fillTxt),
+        el("button", {class: "btn done", type: "button", text: "Done", onclick: () => multi.open = false})));
+    multi.addEventListener("change", showSum);
+    fillTxt.addEventListener("input", () => { fillBox.checked = !!fillTxt.value.trim(); showSum(); });
+    showSum();
+    const iTent = el("input", {type: "checkbox", id: "f_tent", checked: !!draft.tentative});
     const iTitle = inp("f_title", draft.title, "Job name or site"), iLoc = inp("f_location", draft.location, "Address, township/range, etc.");
     const iDate = inp("f_date", draft.date, "", {type: "date"}), iEnd = inp("f_endDate", draft.endDate, "", {type: "date"});
-    const iNotes = el("textarea", {id: "f_notes", placeholder: "What the crew is doing, e.g. Topo and mons"}); iNotes.value = draft.notes || "";
+    const iNotes = el("textarea", {id: "f_notes", placeholder: "Anything else, e.g. Topo and mons, meet owner at gate"}); iNotes.value = draft.notes || "";
     const iProc = el("textarea", {id: "f_proc", placeholder: "Why it's still red or yellow, e.g. Waiting on control from RR"}); iProc.value = draft.procNotes || "";
     const err = el("p", {class: "err", hidden: true});
     const what = job ? [job.jobNo, job.title].filter(Boolean).join(" ") : "";
@@ -833,14 +886,16 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
     const saveBtn = el("button", {class: "btn primary", type: "submit", text: isNew ? "Add job" : "Save"});
     const form = el("form", {style: "display:contents"},
       el("div", {class: "statusset", role: "group", "aria-label": "Processing status"}, statusBtns),
+      el("label", {class: "tentrow", for: "f_tent"}, iTent, el("span", {}, el("b", {class: "tq", text: "?? "}), "Tentative", el("small", {text: "Possible date, not set yet"}))),
       el("div", {class: "fields"},
         el("label", {class: "f", for: "f_jobNo"}, "Job number", iNo),
-        el("label", {class: "f", for: "f_crew"}, "Crew", iCrew),
+        el("div", {class: "f"}, el("label", {for: "f_crew"}, "Crew"), el("div", {class: "crewpair"}, iCrew1, iCrew2)),
         el("label", {class: "f full", for: "f_title"}, "Job", iTitle),
         el("label", {class: "f", for: "f_date"}, "Field date", iDate),
         el("label", {class: "f", for: "f_endDate"}, "Through (optional)", iEnd),
         el("label", {class: "f full", for: "f_location"}, "Location", iLoc),
-        el("label", {class: "f full", for: "f_notes"}, "General task", iNotes),
+        el("div", {class: "f full"}, el("span", {text: "General tasks"}), multi),
+        el("label", {class: "f full", for: "f_notes"}, "Notes", iNotes),
         el("label", {class: "f full", for: "f_proc"}, "Processing notes", iProc)),
       !isNew && stampText(job) ? el("p", {class: "stamp", text: stampText(job)}) : null,
       err, confirmBox,
@@ -853,9 +908,11 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
     form.addEventListener("submit", async e => {
       e.preventDefault(); err.hidden = true;
       const item = stamp({...(job || {}), id: job?.id || newId(), kind: "job", status: draft.status || "scheduled",
-        jobNo: iNo.value.trim(), crew: iCrew.value.trim().toUpperCase(), title: iTitle.value.trim(), location: iLoc.value.trim(), notes: iNotes.value.trim(), procNotes: iProc.value.trim(),
+        jobNo: iNo.value.trim(), crew: [...new Set([iCrew1.value, iCrew2.value].filter(Boolean))].join("/"), tasks: pickedTasks(), tentative: iTent.checked || undefined, title: iTitle.value.trim(), location: iLoc.value.trim(), notes: iNotes.value.trim(), procNotes: iProc.value.trim(),
         date: iDate.value, endDate: iEnd.value && iEnd.value > iDate.value ? iEnd.value : ""});
       if (!item.date) { err.textContent = "Pick a field date."; err.hidden = false; return; }
+      if (!item.tasks.length) delete item.tasks;
+      if (!item.tentative) delete item.tentative;
       if (!item.title && !item.jobNo) { err.textContent = "Enter a job name or job number."; err.hidden = false; return; }
       saveBtn.disabled = true;
       const w = item.jobNo || item.title;
