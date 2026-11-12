@@ -142,6 +142,11 @@ a{color:var(--wc-primary)}
 .wkday{display:flex;flex-direction:column;gap:5px}
 .wkday h2{margin:0;font-size:12px;line-height:18px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--wc-muted);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .wkday.today h2{color:var(--wc-primary)}
+/* the day you clicked: + Job and + Time off start on it */
+.cell.sel, .wkcol.sel{border-color:var(--wc-primary-dark);box-shadow:inset 0 0 0 2px var(--wc-primary-dark)}
+.cell.sel .d, .wkcol.sel .wkhead{color:var(--wc-primary-dark);font-weight:700}
+.wkday.sel h2{color:var(--wc-primary-dark);font-weight:700}
+.wkday.sel h2::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--wc-primary-dark)}
 .wkday .tag{border:1px solid currentColor;border-radius:99px;padding:0 6px;font-size:10px;line-height:15px}
 .wkday .row{display:flex;gap:8px;align-items:baseline}
 
@@ -282,7 +287,7 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
 (() => {
   "use strict";
   // ===================== settings =====================
-  const APP = {name: "Field Schedule", version: "1.3.1"};
+  const APP = {name: "Field Schedule", version: "1.4.0"};
   const CREW = ["MH", "RR", "SR", "TM", "TT"];                // initials offered for time off
   const SUPPORT_EMAIL = "ttucker@welchcomer.com";
   const KEYS_FILE = "keys.json";          // made by the setup screen (#setup); holds the GitHub key, locked with the team passcode
@@ -595,7 +600,7 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
       const d = parse(ds), list = jobsOn(ds), dayOffs = offsOn(ds);
       if ((i === 0 || i === 6) && !list.length && !dayOffs.length && ds !== t) return null;
       const hol = holidayOn(ds);
-      return el("section", {class: "wkday" + (ds === t ? " today" : "")},
+      return el("section", {class: "wkday" + (ds === t ? " today" : ""), "data-day": ds},
         el("h2", {}, el("span", {text: fmtDay(d)}), ds === t ? el("span", {class: "tag", text: "Today"}) : null,
           hol ? el("span", {class: "holtag", text: hol}) : null, dayOffs.map(o => offChip(o, ds, false))),
         list.length ? list.map(jobCard) : el("div", {class: "none", text: hol ? "Office closed" : "No field work scheduled"}));
@@ -613,8 +618,21 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
     const body = view === "month" ? renderMonth() : isPhone() ? renderWeekList() : renderWeekColumns();
     $("view").replaceChildren(!jobs.length && !offs.length && !loaded ? renderEmpty() : body);
     if (view === "month") requestAnimationFrame(fitCells);
+    markSelected();
     $("addBtns").hidden = !canEdit() || $("app").hidden;
   }
+  // ---- picking a day: click empty space in a day to select it; + Job / + Time off then start on that day.
+  // Double-click empty space opens + Job for that day.
+  let selDay = null;
+  const markSelected = () => document.querySelectorAll("#view [data-day]").forEach(n => n.classList.toggle("sel", n.dataset.day === selDay));
+  const visible = ds => !!document.querySelector(`#view [data-day="${ds}"]`);
+  // the picked day if it's on screen, else today if it's on screen, else the first weekday shown
+  const startDay = () => selDay && visible(selDay) ? selDay : visible(todayStr()) ? todayStr()
+    : view === "month" ? ymd(new Date(anchor.getFullYear(), anchor.getMonth(), 1)) : ymd(addDays(weekStart(anchor), 1));
+  const dayFromClick = e => e.target.closest("button, a, input, select, textarea, .chip, .offchip, .card, .hol") ? null
+    : e.target.closest("#view [data-day]")?.dataset.day || null;
+  $("view").addEventListener("click", e => { const ds = dayFromClick(e); if (ds) { selDay = ds; markSelected(); } });
+  $("view").addEventListener("dblclick", e => { const ds = dayFromClick(e); if (ds && canEdit()) { selDay = ds; markSelected(); openJob(null); } });
   function setView(v) { view = v; store.set("view", v); render(); }
   $("vWeek").onclick = () => setView("week");
   $("vMonth").onclick = () => setView("month");
@@ -622,7 +640,7 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
   $("prev").onclick = () => { anchor = view === "week" ? addDays(anchor, -7) : new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1); render(); };
   $("next").onclick = () => { anchor = view === "week" ? addDays(anchor, 7) : new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1); render(); };
   $("addBtn").onclick = () => openJob(null);
-  $("addOff").onclick = () => openOff(null, {date: ymd(view === "week" && weekStart(anchor) > new Date() ? weekStart(anchor) : new Date())});
+  $("addOff").onclick = () => openOff(null, {date: startDay()});
   let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (!$("app").hidden) render(); }, 120); });
 
   // ---------- desktop drag: move or extend a job ----------
@@ -740,7 +758,7 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
   function openJob(job) {
     if (!canEdit()) { if (job) details(job); return; }
     const isNew = !job;
-    const draft = isNew ? {status: "scheduled", date: ymd(view === "week" && weekStart(anchor) > new Date() ? weekStart(anchor) : new Date())} : {...job};
+    const draft = isNew ? {status: "scheduled", date: startDay()} : {...job};
     const statusBtns = Object.entries(STATUS).map(([k, s]) => el("button", {type: "button", class: s.cls, "aria-pressed": String(draft.status === k),
       onclick: e => { draft.status = k; statusBtns.forEach(b => b.setAttribute("aria-pressed", String(b === e.currentTarget))); }}, s.label));
     const inp = (id, v, ph, extra = {}) => el("input", {id, value: v || "", placeholder: ph, ...extra});
