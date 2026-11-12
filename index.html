@@ -85,6 +85,7 @@ h1{font-family:var(--font-display);font-weight:700;font-size:32px;line-height:1;
 .job .name{font-weight:600;font-size:16px;overflow-wrap:anywhere}
 .job .meta{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
 .job .flag{font-size:12.5px;font-weight:600;color:var(--red)}
+.job .notes{font-size:13px;color:var(--muted);font-style:italic;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 9px;border-radius:99px;white-space:nowrap;color:var(--ct);background:color-mix(in srgb,var(--c) 15%,transparent)}
 .pill::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c)}
 .s-scheduled{--c:var(--red);--ct:var(--red)}
@@ -121,7 +122,8 @@ h1{font-family:var(--font-display);font-weight:700;font-size:32px;line-height:1;
 .ok{color:var(--green);font-size:13.5px;margin:0}
 
 /* fab */
-.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));border-radius:99px;padding:13px 20px;box-shadow:0 6px 18px rgb(0 0 0 / .22);font-size:16px;z-index:5}
+.fabs{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;z-index:5}
+.fab{border-radius:99px;padding:13px 18px;box-shadow:0 6px 18px rgb(0 0 0 / .22);font-size:16px}
 
 /* sheet */
 .scrim{position:fixed;inset:0;background:rgb(0 0 0 / .45);z-index:10;display:flex;align-items:flex-end;justify-content:center}
@@ -190,7 +192,10 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   </div>
 </div>
 
-<button class="btn primary fab" id="addBtn" hidden>+ Add</button>
+<div class="fabs" id="addBtns" hidden>
+  <button class="btn fab" id="addOff">+ Time off</button>
+  <button class="btn primary fab" id="addBtn">+ Job</button>
+</div>
 <div id="sheetHost"></div>
 <div class="toast" id="toast" hidden></div>
 
@@ -209,7 +214,7 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     partial:   {label: "Partially processed", cls: "s-partial"},
     processed: {label: "Processed", cls: "s-processed"},
   };
-  const DOW = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+  const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   const $ = id => document.getElementById(id);
   const el = (tag, props = {}, ...kids) => {
     const n = document.createElement(tag);
@@ -233,7 +238,7 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   const parse = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m-1, d); };
   const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate()+n); return x; };
-  const mondayOf = d => { const x = addDays(d, -((d.getDay()+6) % 7)); x.setHours(0,0,0,0); return x; };
+  const weekStart = d => { const x = addDays(d, -d.getDay()); x.setHours(0,0,0,0); return x; };   // weeks start on Sunday
   const todayStr = () => ymd(new Date());
   const fmtDay = d => d.toLocaleDateString(undefined, {weekday: "long", month: "short", day: "numeric"});
   const fmtShort = d => d.toLocaleDateString(undefined, {month: "short", day: "numeric"});
@@ -355,33 +360,41 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   }
 
   // ---------- cards ----------
+  const hoverText = j => {
+    const head = [j.crew, j.jobNo, j.title].filter(Boolean).join(" · ");
+    return head + "\n" + (j.notes ? "Office notes: " + j.notes : "No office notes");
+  };
   function jobCard(j) {
     const st = STATUS[j.status] || STATUS.scheduled;
     const meta = [j.crew, j.location].filter(Boolean).join(" · ");
-    return el("button", {class: `job ${st.cls}`, onclick: () => openJob(j)},
+    return el("button", {class: `job ${st.cls}`, title: hoverText(j), onclick: () => openJob(j)},
       el("span", {class: "stripe", "aria-hidden": "true"}),
       el("span", {class: "main"},
         j.jobNo ? el("span", {class: "no", text: j.jobNo}) : null,
         el("span", {class: "name", text: j.title || "Untitled job"}),
         meta ? el("span", {class: "meta", text: meta}) : null,
+        j.notes ? el("span", {class: "notes", text: j.notes}) : null,
         j.endDate && j.endDate > j.date ? el("span", {class: "meta", text: `${fmtShort(parse(j.date))} – ${fmtShort(parse(j.endDate))}`}) : null,
         awaiting(j) ? el("span", {class: "flag", text: "Field work done · waiting on office"}) : null),
       el("span", {class: "pill"}, el("span", {class: "lbl", text: st.label})));
   }
-  const offChip = o => el("button", {class: "offchip", title: o.notes || offLabel(o), onclick: () => openOff(o), text: offLabel(o)});
+  // phones/tablets: in month view a tap shows the details first, with an Edit button
+  const touchLike = () => matchMedia("(hover: none)").matches || innerWidth < 640;
+  const offChip = (o, viewFirst) => el("button", {class: "offchip", title: offLabel(o) + (o.notes ? "\n" + o.notes : ""),
+    onclick: () => (viewFirst && touchLike() ? details(o) : openOff(o)), text: offLabel(o)});
 
   // ---------- views ----------
   function renderWeek() {
-    const start = mondayOf(anchor), t = todayStr();
+    const start = weekStart(anchor), t = todayStr();
     $("range").textContent = `${fmtShort(start)} – ${fmtShort(addDays(start, 6))}, ${addDays(start, 6).getFullYear()}`;
     const out = [];
     for (let i = 0; i < 7; i++) {
       const d = addDays(start, i), ds = ymd(d);
       const list = jobs.filter(j => covers(j, ds)).sort(byOrder);
       const dayOffs = offs.filter(o => covers(o, ds)).sort(byOrder);
-      if (i >= 5 && !list.length && !dayOffs.length && ds !== t) continue;
+      if ((i === 0 || i === 6) && !list.length && !dayOffs.length && ds !== t) continue;
       out.push(el("section", {class: "day" + (ds === t ? " today" : "")},
-        el("h2", {}, el("span", {text: fmtDay(d)}), ds === t ? el("span", {class: "tag", text: "Today"}) : null, dayOffs.map(offChip)),
+        el("h2", {}, el("span", {text: fmtDay(d)}), ds === t ? el("span", {class: "tag", text: "Today"}) : null, dayOffs.map(o => offChip(o, false))),
         list.length ? el("div", {class: "jobs"}, list.map(jobCard)) : el("div", {class: "none", text: "No field work scheduled"})));
     }
     return el("div", {class: "days"}, out);
@@ -390,15 +403,15 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1), t = todayStr();
     $("range").textContent = first.toLocaleDateString(undefined, {month: "long", year: "numeric"});
     const cells = DOW.map(d => el("div", {class: "dow", text: d}));
-    const end = addDays(mondayOf(new Date(first.getFullYear(), first.getMonth() + 1, 0)), 6);
-    for (let d = mondayOf(first); d <= end; d = addDays(d, 1)) {
+    const end = addDays(weekStart(new Date(first.getFullYear(), first.getMonth() + 1, 0)), 6);
+    for (let d = weekStart(first); d <= end; d = addDays(d, 1)) {
       const ds = ymd(d), day = new Date(d), list = jobs.filter(j => covers(j, ds)).sort(byOrder);
       cells.push(el("div", {class: "cell" + (d.getMonth() !== first.getMonth() ? " out" : "") + (ds === t ? " today" : "")},
         el("button", {class: "d", text: d.getDate(), "aria-label": "Open week of " + fmtDay(d), onclick: () => { anchor = day; setView("week"); }}),
-        offs.filter(o => covers(o, ds)).sort(byOrder).map(offChip),
+        offs.filter(o => covers(o, ds)).sort(byOrder).map(o => offChip(o, true)),
         list.map(j => el("button", {class: `chip ${(STATUS[j.status] || STATUS.scheduled).cls}`,
-          title: [j.crew, j.jobNo, j.title].filter(Boolean).join(" · ") + " — " + (STATUS[j.status] || STATUS.scheduled).label,
-          onclick: () => openJob(j)},
+          title: hoverText(j),
+          onclick: () => (touchLike() ? details(j) : openJob(j))},
           j.crew ? el("b", {text: j.crew + " "}) : null, [j.jobNo, j.title || "Untitled"].filter(Boolean).join(" ")))));
     }
     return el("div", {class: "month-wrap"}, el("div", {class: "month"}, cells));
@@ -406,7 +419,7 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   function renderEmpty() {
     return el("div", {class: "panel"},
       el("h3", {text: loaded ? "No jobs on the schedule yet" : "Loading the schedule…"}),
-      loaded ? el("p", {text: canEdit() ? "Add the first field job or time off with the + Add button. New jobs start red until the office processes the field data." : "No jobs have been added yet."}) : null);
+      loaded ? el("p", {text: canEdit() ? "Add the first field job with + Job, or time off with + Time off. New jobs start red until the office processes the field data." : "No jobs have been added yet."}) : null);
   }
   function render() {
     renderSummary();
@@ -414,7 +427,7 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     $("vMonth").setAttribute("aria-pressed", String(view === "month"));
     const body = view === "week" ? renderWeek() : renderMonth();
     $("view").replaceChildren(!jobs.length && !offs.length ? renderEmpty() : body);
-    $("addBtn").hidden = !canEdit() || $("app").hidden;
+    $("addBtns").hidden = !canEdit() || $("app").hidden;
   }
   function setView(v) { view = v; store.set("view", v); render(); }
   $("vWeek").onclick = () => setView("week");
@@ -423,6 +436,7 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   $("prev").onclick = () => { anchor = view === "week" ? addDays(anchor, -7) : new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1); render(); };
   $("next").onclick = () => { anchor = view === "week" ? addDays(anchor, 7) : new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1); render(); };
   $("addBtn").onclick = () => openJob(null);
+  $("addOff").onclick = () => openOff(null, {date: ymd(view === "week" && weekStart(anchor) > new Date() ? weekStart(anchor) : new Date())});
 
   let toastT;
   function toast(m) { const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); }
@@ -453,13 +467,15 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
         row("Date", fmtDay(parse(e.date)) + (e.endDate && e.endDate > e.date ? " – " + fmtDay(parse(e.endDate)) : "")),
         row("Location", e.location), row("Notes", e.notes)),
       stampText(e) ? el("p", {class: "stamp", text: stampText(e)}) : null,
-      el("div", {class: "actions"}, el("span"), el("button", {class: "btn", type: "button", text: "Close", onclick: () => s.close()})));
+      el("div", {class: "actions"},
+        canEdit() ? el("button", {class: "btn primary", type: "button", text: "Edit", onclick: () => { s.close(); isOff ? openOff(e) : openJob(e); }}) : el("span"),
+        el("button", {class: "btn", type: "button", text: "Close", onclick: () => s.close()})));
   }
 
   function openJob(job) {
     if (!canEdit()) { if (job) details(job); return; }
     const isNew = !job;
-    const draft = isNew ? {status: "scheduled", date: ymd(view === "week" && mondayOf(anchor) > new Date() ? mondayOf(anchor) : new Date())} : {...job};
+    const draft = isNew ? {status: "scheduled", date: ymd(view === "week" && weekStart(anchor) > new Date() ? weekStart(anchor) : new Date())} : {...job};
     const statusBtns = Object.entries(STATUS).map(([k, s]) => el("button", {type: "button", class: s.cls, "aria-pressed": String(draft.status === k),
       onclick: e => { draft.status = k; statusBtns.forEach(b => b.setAttribute("aria-pressed", String(b === e.currentTarget))); }}, s.label));
     const inp = (id, v, ph, extra = {}) => el("input", {id, value: v || "", placeholder: ph, ...extra});
@@ -563,7 +579,7 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   }
 
   // ---------- lock screen ----------
-  function gate(...content) { $("gate").replaceChildren(...content); $("gate").hidden = false; $("app").hidden = true; $("addBtn").hidden = true; $("who").hidden = true; }
+  function gate(...content) { $("gate").replaceChildren(...content); $("gate").hidden = false; $("app").hidden = true; $("addBtns").hidden = true; $("who").hidden = true; }
   function lock(why) {
     session = null; store.del("session"); docData = {v: 1, jobs: []}; jobs = []; offs = []; sha = null; etag = null; loaded = false;
     const pass = el("input", {id: "pass", type: "password", autocomplete: "current-password", placeholder: "Passcode", enterkeyhint: "go"});
