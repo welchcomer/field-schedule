@@ -282,7 +282,7 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
 (() => {
   "use strict";
   // ===================== settings =====================
-  const APP = {name: "Field Schedule", version: "1.3.0"};
+  const APP = {name: "Field Schedule", version: "1.3.1"};
   const CREW = ["MH", "RR", "SR", "TM", "TT"];                // initials offered for time off
   const SUPPORT_EMAIL = "ttucker@welchcomer.com";
   const KEYS_FILE = "keys.json";          // made by the setup screen (#setup); holds the GitHub key, locked with the team passcode
@@ -524,10 +524,11 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
   const jobChip = (j, day) => draggable(el("button", {class: `chip ${(STATUS[j.status] || STATUS.scheduled).cls}`, title: hoverText(j), onclick: () => { if (!suppressClick) details(j); }},
     j.crew ? el("b", {text: j.crew + " "}) : null, [j.jobNo, j.title || "Untitled"].filter(Boolean).join(" ")), j, day);
 
-  // Sun / Sat columns stay as narrow as their label unless something is scheduled on them
+  // Sun / Sat columns stay as narrow as their label unless a job is scheduled on them
   const NARROW = () => isPhone() ? "28px" : "44px";
   function columns(days) {
-    const used = w => days.some(ds => parse(ds).getDay() === w && (jobsOn(ds).length || offsOn(ds).length));
+    // only jobs widen a weekend column; time off on a weekend shows as initials in the narrow column
+  const used = w => days.some(ds => parse(ds).getDay() === w && jobsOn(ds).length);
     const sun = used(0), sat = used(6);
     return {sun, sat, css: `${sun ? "minmax(0,1fr)" : NARROW()} repeat(5, minmax(0,1fr)) ${sat ? "minmax(0,1fr)" : NARROW()}`};
   }
