@@ -275,6 +275,22 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   const endOf = j => j.endDate && j.endDate >= j.date ? j.endDate : j.date;
   const covers = (j, day) => j.date <= day && endOf(j) >= day;
   const awaiting = j => (j.status || "scheduled") === "scheduled" && endOf(j) < todayStr();
+  const dayNum = s => { const [y, m, d] = s.split("-").map(Number); return Date.UTC(y, m - 1, d) / 86400000; };
+  // time off can repeat every N weeks (same weekday as its first day), until an optional date, minus skipped days
+  const occurs = (o, day) => {
+    if (o.skip && o.skip.includes(day)) return false;
+    if (!o.repeat) return covers(o, day);
+    if (day < o.date || (o.repeat.until && day > o.repeat.until)) return false;
+    const span = dayNum(endOf(o)) - dayNum(o.date) + 1, period = 7 * (o.repeat.every || 1);
+    return (dayNum(day) - dayNum(o.date)) % period < span;
+  };
+  const weekdayName = s => parse(s).toLocaleDateString(undefined, {weekday: "long"});
+  const repeatText = o => {
+    if (!o.repeat) return "";
+    const n = o.repeat.every || 1;
+    const base = n === 1 ? `Every ${weekdayName(o.date)}` : n === 2 ? `Every other ${weekdayName(o.date)}` : `Every ${n} weeks on ${weekdayName(o.date)}`;
+    return base + (o.repeat.until ? ` until ${fmtShort(parse(o.repeat.until))}` : "") + `, starting ${fmtShort(parse(o.date))}`;
+  };
   const offLabel = o => `${o.crew || "Someone"} ${(o.offType || "Off").toLowerCase()}`;
   const byOrder = (a, b) => (a.date + (a.crew || "") + (a.jobNo || "") + (a.title || "")).localeCompare(b.date + (b.crew || "") + (b.jobNo || "") + (b.title || ""));
 
@@ -360,14 +376,11 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   }
 
   // ---------- cards ----------
-  const hoverText = j => {
-    const head = [j.crew, j.jobNo, j.title].filter(Boolean).join(" · ");
-    return head + "\n" + (j.notes ? "Office notes: " + j.notes : "No office notes");
-  };
+  const hoverText = e => e.notes || undefined;   // tooltip is just the typed notes
   function jobCard(j) {
     const st = STATUS[j.status] || STATUS.scheduled;
     const meta = [j.crew, j.location].filter(Boolean).join(" · ");
-    return el("button", {class: `job ${st.cls}`, title: hoverText(j), onclick: () => openJob(j)},
+    return el("button", {class: `job ${st.cls}`, title: hoverText(j), onclick: () => details(j)},
       el("span", {class: "stripe", "aria-hidden": "true"}),
       el("span", {class: "main"},
         j.jobNo ? el("span", {class: "no", text: j.jobNo}) : null,
@@ -378,10 +391,9 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
         awaiting(j) ? el("span", {class: "flag", text: "Field work done · waiting on office"}) : null),
       el("span", {class: "pill"}, el("span", {class: "lbl", text: st.label})));
   }
-  // phones/tablets: in month view a tap shows the details first, with an Edit button
-  const touchLike = () => matchMedia("(hover: none)").matches || innerWidth < 640;
-  const offChip = (o, viewFirst) => el("button", {class: "offchip", title: offLabel(o) + (o.notes ? "\n" + o.notes : ""),
-    onclick: () => (viewFirst && touchLike() ? details(o) : openOff(o)), text: offLabel(o)});
+  // clicking anything shows its details first, with an Edit button
+  const offChip = (o, day) => el("button", {class: "offchip", title: hoverText(o), onclick: () => details(o, day),
+    text: offLabel(o) + (o.repeat ? " ↻" : "")});
 
   // ---------- views ----------
   function renderWeek() {
@@ -391,10 +403,10 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     for (let i = 0; i < 7; i++) {
       const d = addDays(start, i), ds = ymd(d);
       const list = jobs.filter(j => covers(j, ds)).sort(byOrder);
-      const dayOffs = offs.filter(o => covers(o, ds)).sort(byOrder);
+      const dayOffs = offs.filter(o => occurs(o, ds)).sort(byOrder);
       if ((i === 0 || i === 6) && !list.length && !dayOffs.length && ds !== t) continue;
       out.push(el("section", {class: "day" + (ds === t ? " today" : "")},
-        el("h2", {}, el("span", {text: fmtDay(d)}), ds === t ? el("span", {class: "tag", text: "Today"}) : null, dayOffs.map(o => offChip(o, false))),
+        el("h2", {}, el("span", {text: fmtDay(d)}), ds === t ? el("span", {class: "tag", text: "Today"}) : null, dayOffs.map(o => offChip(o, ds))),
         list.length ? el("div", {class: "jobs"}, list.map(jobCard)) : el("div", {class: "none", text: "No field work scheduled"})));
     }
     return el("div", {class: "days"}, out);
@@ -408,10 +420,10 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
       const ds = ymd(d), day = new Date(d), list = jobs.filter(j => covers(j, ds)).sort(byOrder);
       cells.push(el("div", {class: "cell" + (d.getMonth() !== first.getMonth() ? " out" : "") + (ds === t ? " today" : "")},
         el("button", {class: "d", text: d.getDate(), "aria-label": "Open week of " + fmtDay(d), onclick: () => { anchor = day; setView("week"); }}),
-        offs.filter(o => covers(o, ds)).sort(byOrder).map(o => offChip(o, true)),
+        offs.filter(o => occurs(o, ds)).sort(byOrder).map(o => offChip(o, ds)),
         list.map(j => el("button", {class: `chip ${(STATUS[j.status] || STATUS.scheduled).cls}`,
           title: hoverText(j),
-          onclick: () => (touchLike() ? details(j) : openJob(j))},
+          onclick: () => details(j)},
           j.crew ? el("b", {text: j.crew + " "}) : null, [j.jobNo, j.title || "Untitled"].filter(Boolean).join(" ")))));
     }
     return el("div", {class: "month-wrap"}, el("div", {class: "month"}, cells));
@@ -455,8 +467,8 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
   const stampText = e => e.updatedBy || e.updatedAt
     ? `Last updated${e.updatedBy ? " by " + e.updatedBy : ""}${e.updatedAt ? " · " + new Date(e.updatedAt).toLocaleString(undefined, {month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}) : ""}` : "";
 
-  // read-only details (view passcode)
-  function details(e) {
+  // details view: shown on click, with an Edit button
+  function details(e, day) {
     const isOff = e.kind === "off", st = STATUS[e.status] || STATUS.scheduled;
     const row = (k, v) => v ? [el("dt", {text: k}), el("dd", {text: v})] : null;
     const s = sheet("Details",
@@ -464,11 +476,12 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
       isOff ? null : el("span", {class: `pill ${st.cls}`, style: "align-self:flex-start"}, el("span", {class: "lbl", text: st.label})),
       el("dl", {class: "facts"},
         row("Job", e.jobNo), row(isOff ? "Who" : "Crew", e.crew),
-        row("Date", fmtDay(parse(e.date)) + (e.endDate && e.endDate > e.date ? " – " + fmtDay(parse(e.endDate)) : "")),
+        e.repeat ? row("Repeats", repeatText(e)) : row("Date", fmtDay(parse(e.date)) + (e.endDate && e.endDate > e.date ? " – " + fmtDay(parse(e.endDate)) : "")),
+        e.repeat && day ? row("This day", fmtDay(parse(day))) : null,
         row("Location", e.location), row("Notes", e.notes)),
       stampText(e) ? el("p", {class: "stamp", text: stampText(e)}) : null,
       el("div", {class: "actions"},
-        canEdit() ? el("button", {class: "btn primary", type: "button", text: "Edit", onclick: () => { s.close(); isOff ? openOff(e) : openJob(e); }}) : el("span"),
+        canEdit() ? el("button", {class: "btn primary", type: "button", text: "Edit", onclick: () => { s.close(); isOff ? openOff(e, {}, day) : openJob(e); }}) : el("span"),
         el("button", {class: "btn", type: "button", text: "Close", onclick: () => s.close()})));
   }
 
@@ -501,7 +514,7 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
         el("label", {class: "f", for: "f_date"}, "Field date", iDate),
         el("label", {class: "f", for: "f_endDate"}, "Through (optional)", iEnd),
         el("label", {class: "f full", for: "f_location"}, "Location", iLoc),
-        el("label", {class: "f full", for: "f_notes"}, "Office notes", iNotes)),
+        el("label", {class: "f full", for: "f_notes"}, "Notes", iNotes)),
       !isNew && stampText(job) ? el("p", {class: "stamp", text: stampText(job)}) : null,
       err, confirmBox,
       el("div", {class: "actions"},
@@ -529,7 +542,7 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     }
   }
 
-  function openOff(entry, seed = {}) {
+  function openOff(entry, seed = {}, onDay) {
     if (!canEdit()) { if (entry) details(entry); return; }
     const isNew = !entry;
     const d = isNew ? {offType: "Off", crew: seed.crew || "", date: seed.date || todayStr(), endDate: "", notes: ""} : {...entry};
@@ -540,9 +553,20 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
     const iFrom = el("input", {id: "o_date", type: "date", value: d.date});
     const iTo = el("input", {id: "o_end", type: "date", value: d.endDate || ""});
     const iNote = el("textarea", {id: "o_notes", placeholder: "Optional, e.g. back at 1pm"}); iNote.value = d.notes || "";
+    const every = String(d.repeat?.every || 0);
+    const iRep = el("select", {id: "o_repeat"}, [["0", "Doesn't repeat"], ["1", "Every week"], ["2", "Every 2 weeks"], ["4", "Every 4 weeks"]]
+      .map(([v, t]) => el("option", {value: v, text: t, selected: v === every})));
+    const iUntil = el("input", {id: "o_until", type: "date", value: d.repeat?.until || ""});
+    const untilLabel = el("label", {class: "f", for: "o_until", hidden: every === "0"}, "Repeat until (optional)", iUntil);
+    const repHint = el("p", {class: "notice"});
+    const hint = () => { untilLabel.hidden = iRep.value === "0"; repHint.textContent = iRep.value === "0" || !iFrom.value ? "" : repeatText({date: iFrom.value, repeat: {every: +iRep.value, until: iUntil.value}}); };
+    iRep.addEventListener("change", hint); iFrom.addEventListener("change", hint); iUntil.addEventListener("change", hint);
     const err = el("p", {class: "err", hidden: true});
-    const confirmBox = el("div", {class: "confirm", hidden: true}, el("span", {text: "Remove this time off?"}),
-      el("button", {class: "btn danger", type: "button", text: "Remove", onclick: doDelete}),
+    const oneDay = !isNew && entry.repeat && onDay;
+    const confirmBox = el("div", {class: "confirm", hidden: true},
+      el("span", {text: oneDay ? "Remove which days?" : "Remove this time off?"}),
+      oneDay ? el("button", {class: "btn danger", type: "button", text: "Just " + fmtShort(parse(onDay)), onclick: () => doDelete(false)}) : null,
+      el("button", {class: "btn danger", type: "button", text: oneDay ? "All of them" : "Remove", onclick: () => doDelete(true)}),
       el("button", {class: "btn", type: "button", text: "Keep", onclick: () => confirmBox.hidden = true}));
     const saveBtn = el("button", {class: "btn primary", type: "submit", text: isNew ? "Add time off" : "Save"});
     const form = el("form", {style: "display:contents"},
@@ -555,6 +579,9 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
         el("label", {class: "f full", for: "o_crew"}, "Who", iWho),
         el("label", {class: "f", for: "o_date"}, "From", iFrom),
         el("label", {class: "f", for: "o_end"}, "Through (optional)", iTo),
+        el("label", {class: "f", for: "o_repeat"}, "Repeats", iRep),
+        untilLabel,
+        el("div", {class: "full"}, repHint),
         el("label", {class: "f full", for: "o_notes"}, "Note", iNote)),
       !isNew && stampText(entry) ? el("p", {class: "stamp", text: stampText(entry)}) : null,
       err, confirmBox,
@@ -562,19 +589,28 @@ dl.facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line}
         !isNew ? el("button", {class: "btn danger", type: "button", text: "Remove", onclick: () => confirmBox.hidden = false}) : el("span"),
         el("div", {class: "right"}, el("button", {class: "btn", type: "button", text: "Cancel", onclick: () => s.close()}), saveBtn)));
     const s = sheet(isNew ? "Add time off" : "Time off", form);
-    iWho.focus();
+    hint(); iWho.focus();
     form.addEventListener("submit", async e => {
       e.preventDefault(); err.hidden = true;
       const item = stamp({id: entry?.id || newId(), kind: "off", offType: d.offType, crew: iWho.value.trim().toUpperCase(),
         date: iFrom.value, endDate: iTo.value && iTo.value > iFrom.value ? iTo.value : "", notes: iNote.value.trim()});
+      if (iRep.value !== "0") {
+        item.repeat = {every: +iRep.value, until: iUntil.value && iUntil.value >= iFrom.value ? iUntil.value : ""};
+        const keep = (entry?.skip || []).filter(x => x >= item.date);
+        if (keep.length) item.skip = keep;
+      }
       if (!item.crew || !item.date) { err.textContent = "Enter who is off and the first day."; err.hidden = false; return; }
       saveBtn.disabled = true;
       try { await save(upsert(item), `${isNew ? "Add" : "Edit"} time off: ${offLabel(item)} ${item.date}`); s.close(); toast(isNew ? "Time off added" : "Saved"); }
       catch (ex) { saveBtn.disabled = false; err.textContent = saveError(ex); err.hidden = false; }
     });
-    async function doDelete() {
-      try { await save(remove(entry.id), `Remove time off: ${offLabel(entry)} ${entry.date}`); s.close(); toast("Time off removed"); }
-      catch (ex) { err.textContent = saveError(ex); err.hidden = false; }
+    async function doDelete(all) {
+      try {
+        if (all) await save(remove(entry.id), `Remove time off: ${offLabel(entry)} ${entry.date}${entry.repeat ? " (repeating)" : ""}`);
+        else await save(doc => { const it = doc.jobs.find(x => x.id === entry.id); if (it) { it.skip = [...new Set([...(it.skip || []), onDay])].sort(); stamp(it); } },
+          `Skip ${onDay} for repeating time off: ${offLabel(entry)}`);
+        s.close(); toast(all ? "Time off removed" : "Removed for " + fmtShort(parse(onDay)));
+      } catch (ex) { err.textContent = saveError(ex); err.hidden = false; }
     }
   }
 
