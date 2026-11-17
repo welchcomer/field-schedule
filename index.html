@@ -304,6 +304,16 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
 }
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .16s ease-out}@keyframes up{from{transform:translateY(16px);opacity:.7}}}
 </style>
+<script>
+  // Shown inside Teams or Outlook (as the Field Schedule app): tell the host the page loaded. Does nothing in a normal browser tab.
+  if (window.self !== window.top) {
+    const t = document.createElement("script");
+    t.src = "https://cdn.jsdelivr.net/npm/@microsoft/teams-js@2.58.0/dist/umd/MicrosoftTeams.min.js";
+    t.integrity = "sha384-sMo/EOqQPa1OCup2/VBRum7oFeOS22kvs8WGDc45xK53tUVZzFR5WwFYDUYN1LO4"; t.crossOrigin = "anonymous";
+    t.onload = () => { try { microsoftTeams.app.initialize().then(() => microsoftTeams.app.notifySuccess()).catch(() => {}); } catch (e) {} };
+    document.head.append(t);
+  }
+</script>
 </head>
 <body>
 <header class="bar">
@@ -360,7 +370,7 @@ body.resizing, body.resizing *{cursor:ew-resize!important;user-select:none}
 (() => {
   "use strict";
   // ===================== settings =====================
-  const APP = {name: "Field Schedule", version: "1.8.0"};
+  const APP = {name: "Field Schedule", version: "1.8.1"};
   const CREW = ["MH", "RR", "SR", "TM", "TT"];                // crew initials
   const TASKS = ["Mon Search", "Set Mons", "Set Control", "Topo", "Dips", "Scan", "Flight", "Stake Curb", "Stake Fence", "Stake Signs", "Stake Sewer", "Stake Storm", "Stake Striping", "Stake Sawcuts", "Stake Water"];
   const SUPPORT_EMAIL = "ttucker@welchcomer.com";
